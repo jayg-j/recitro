@@ -2,194 +2,157 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/recitro_store.dart';
-import '../models/call_outcome.dart';
-import '../models/recitation_session.dart';
+import '../flows/student_create_flow.dart';
 import '../models/student.dart';
-import '../widgets/reward_center_dialog.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ui.dart';
 import 'student_detail_screen.dart';
 
 class StudentsTab extends StatelessWidget {
   const StudentsTab({super.key});
 
-  Future<void> _confirmDelete(BuildContext context, Student student) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete student?'),
-        content: Text(student.name),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      await context.read<RecitroStore>().deleteStudent(student.id);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final store = context.watch<RecitroStore>();
-    final students = store.students;
+    final students = [...store.students]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final readyTotal =
+        students.fold<int>(0, (n, s) => n + store.claimableRewardCount(s.id));
 
     return CustomScrollView(
       slivers: [
-        const SliverAppBar(
-          floating: true,
-          title: Text('Students'),
+        SliverToBoxAdapter(
+          child: PageTitle(
+            title: 'Students',
+            subtitle: students.isEmpty
+                ? 'Your class list.'
+                : [
+                    '${students.length} ${students.length == 1 ? 'student' : 'students'}',
+                    if (readyTotal > 0)
+                      '$readyTotal ${readyTotal == 1 ? 'reward' : 'rewards'} ready',
+                  ].join(' · '),
+          ),
         ),
         if (students.isEmpty)
           SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.people_outline_rounded,
-                      size: 64, color: Colors.black26),
-                  SizedBox(height: 12),
-                  Text('No students yet'),
-                  SizedBox(height: 4),
-                  Text('Tap Add in the sidebar'),
-                ],
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.people_outline_rounded,
+              title: 'No students yet',
+              message: 'Add the students in your class to start calling them.',
+              action: FilledButton.icon(
+                onPressed: () => showStudentCreateFlow(context),
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Add student'),
               ),
             ),
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            sliver: SliverList.separated(
-              itemCount: students.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final student = students[index];
-                final total = store.totalPointsForStudent(student.id);
-                final unclaimed = _unclaimedCount(store, student.id);
-                return Material(
-                  color: Colors.white,
-                  elevation: 2,
-                  shadowColor: scheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              StudentDetailScreen(studentId: student.id),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor:
-                                scheme.primary.withValues(alpha: 0.12),
-                            child: Text(
-                              student.name.isNotEmpty
-                                  ? student.name[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: scheme.primary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              student.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                          if (unclaimed > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: FilledButton.tonal(
-                                onPressed: () => _claimNext(context, student.id),
-                                child: Text('Claim ($unclaimed)'),
-                              ),
-                            ),
-                          Tooltip(
-                            message: 'Total points',
-                            child: TextButton.icon(
-                              onPressed: () {},
-                              icon: Icon(Icons.stars_rounded,
-                                  color: scheme.secondary),
-                              label: Text(
-                                '$total',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed: () =>
-                                _confirmDelete(context, student),
-                            icon: const Icon(Icons.delete_outline_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+            padding: const EdgeInsets.fromLTRB(
+              Space.page,
+              Space.lg,
+              Space.page,
+              96,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Card(
+                child: Column(
+                  children: [
+                    for (var i = 0; i < students.length; i++) ...[
+                      if (i > 0) const Divider(indent: 68),
+                      _StudentRow(student: students[i]),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
       ],
     );
   }
+}
 
-  int _unclaimedCount(RecitroStore store, String studentId) {
-    var n = 0;
-    for (final session in store.sessions) {
-      final state = session.studentStates[studentId];
-      if (store.canClaimReward(session, studentId)) {
-        n++;
-      }
+enum _Action { rename, delete }
+
+class _StudentRow extends StatelessWidget {
+  const _StudentRow({required this.student});
+
+  final Student student;
+
+  Future<void> _onAction(BuildContext context, _Action action) async {
+    final store = context.read<RecitroStore>();
+    switch (action) {
+      case _Action.rename:
+        await showStudentCreateFlow(context, student: student);
+      case _Action.delete:
+        final ok = await confirmDialog(
+          context,
+          title: 'Delete ${student.name}?',
+          message: 'Their points and reward history will be removed.',
+          confirmLabel: 'Delete',
+          destructive: true,
+        );
+        if (ok) await store.deleteStudent(student.id);
     }
-    return n;
   }
 
-  Future<void> _claimNext(BuildContext context, String studentId) async {
-    final store = context.read<RecitroStore>();
-    RecitationSession? target;
-    for (final session in store.sessions) {
-      final state = session.studentStates[studentId];
-      if (store.canClaimReward(session, studentId)) {
-        target = session;
-        break;
-      }
-    }
-    if (target == null) return;
-    final student = store.studentById(studentId);
-    if (student == null) return;
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<RecitroStore>();
+    final text = Theme.of(context).textTheme;
+    final total = store.totalPointsForStudent(student.id);
+    final ready = store.claimableRewardCount(student.id);
+    final rewards = store.ledgerForStudent(student.id).length;
 
-    final state = target.studentStates[studentId]!;
-    await showRewardCenterDialog(
-      context: context,
-      studentName: student.name,
-      rewardLabel: target.rewardLabel,
-      pointsEarned: state.pointsEarned,
-      pointsRequired: target.pointsRequiredForReward,
-      canClaim: true,
-      onClaim: () => store.claimReward(target!, studentId),
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StudentDetailScreen(studentId: student.id),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.xs, Space.md),
+        child: Row(
+          children: [
+            StudentAvatar(name: student.name),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    student.name,
+                    style: text.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$total pts · $rewards ${rewards == 1 ? 'reward' : 'rewards'}',
+                    style: text.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            if (ready > 0)
+              Pill(
+                label: '$ready ready',
+                color: AppColors.amberInk,
+                icon: Icons.redeem_rounded,
+              ),
+            PopupMenuButton<_Action>(
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.muted),
+              onSelected: (a) => _onAction(context, a),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: _Action.rename, child: Text('Rename')),
+                PopupMenuItem(value: _Action.delete, child: Text('Delete')),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

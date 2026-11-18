@@ -5,9 +5,9 @@ enum CallOutcome {
   notAnswered;
 
   String get label => switch (this) {
-        CallOutcome.notCalled => 'Not called',
-        CallOutcome.pending => 'Awaiting response',
+        CallOutcome.notCalled => 'Waiting',
+        CallOutcome.pending => 'Being called',
         CallOutcome.answered => 'Answered',
-        CallOutcome.notAnswered => 'Not answered',
+        CallOutcome.notAnswered => 'Didn\'t answer',
       };
 }

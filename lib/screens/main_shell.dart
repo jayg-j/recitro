@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../flows/session_create_flow.dart';
+import '../data/recitro_store.dart';
+import '../flows/session_form_screen.dart';
 import '../flows/student_create_flow.dart';
+import '../theme/app_theme.dart';
 import 'sessions_tab.dart';
 import 'students_tab.dart';
 
@@ -20,7 +23,7 @@ class _MainShellState extends State<MainShell> {
   Future<void> _onAdd() async {
     switch (_section) {
       case ShellSection.sessions:
-        await showSessionCreateFlow(context);
+        await openSessionForm(context);
       case ShellSection.students:
         await showStudentCreateFlow(context);
     }
@@ -28,57 +31,102 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final extended = MediaQuery.sizeOf(context).width > 720;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 720;
 
-    return Scaffold(
-      body: Row(
-        children: [
-          NavigationRail(
-            extended: extended,
-            backgroundColor: scheme.primary,
-            selectedIndex: _section.index,
-            onDestinationSelected: (i) {
-              if (i == 2) {
-                _onAdd();
-                return;
-              }
-              setState(() => _section = ShellSection.values[i]);
-            },
-            leading: Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child:
-                  Icon(Icons.school_rounded, color: scheme.secondary, size: 32),
-            ),
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.auto_stories_outlined),
-                selectedIcon: Icon(Icons.auto_stories_rounded),
-                label: Text('Sessions'),
+    final body = IndexedStack(
+      index: _section.index,
+      children: const [SessionsTab(), StudentsTab()],
+    );
+
+    final store = context.watch<RecitroStore>();
+    // The empty state already shows its own button.
+    final tabEmpty = _section == ShellSection.sessions
+        ? store.sessions.isEmpty
+        : store.students.isEmpty;
+
+    final fab = tabEmpty ? null : FloatingActionButton.extended(
+      onPressed: _onAdd,
+      icon: const Icon(Icons.add_rounded),
+      label: Text(
+        _section == ShellSection.sessions ? 'New session' : 'Add student',
+      ),
+    );
+
+    if (wide) {
+      return Scaffold(
+        floatingActionButton: fab,
+        body: Row(
+          children: [
+            NavigationRail(
+              extended: width >= 1000,
+              selectedIndex: _section.index,
+              onDestinationSelected: (i) =>
+                  setState(() => _section = ShellSection.values[i]),
+              leading: const Padding(
+                padding: EdgeInsets.symmetric(vertical: Space.xl),
+                child: _Logo(onDark: true),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.people_outline_rounded),
-                selectedIcon: Icon(Icons.people_rounded),
-                label: Text('Students'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.add_circle_outline_rounded),
-                selectedIcon: Icon(Icons.add_circle_rounded),
-                label: Text('Add'),
-              ),
-            ],
-          ),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(
-            child: IndexedStack(
-              index: _section.index,
-              children: const [
-                SessionsTab(),
-                StudentsTab(),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.auto_stories_outlined),
+                  selectedIcon: Icon(Icons.auto_stories_rounded),
+                  label: Text('Sessions'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_outline_rounded),
+                  selectedIcon: Icon(Icons.people_rounded),
+                  label: Text('Students'),
+                ),
               ],
             ),
+            Expanded(child: SafeArea(child: body)),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      floatingActionButton: fab,
+      body: SafeArea(bottom: false, child: body),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _section.index,
+        onDestinationSelected: (i) =>
+            setState(() => _section = ShellSection.values[i]),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.auto_stories_outlined),
+            selectedIcon: Icon(Icons.auto_stories_rounded),
+            label: 'Sessions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline_rounded),
+            selectedIcon: Icon(Icons.people_rounded),
+            label: 'Students',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Logo extends StatelessWidget {
+  const _Logo({this.onDark = false});
+
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: onDark ? AppColors.amber : AppColors.navy,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        Icons.school_rounded,
+        color: onDark ? AppColors.navy : Colors.white,
       ),
     );
   }

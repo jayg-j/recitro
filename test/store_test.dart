@@ -117,6 +117,98 @@ void main() {
     expect(store.totalPointsForStudent(studentId), 0);
   });
 
+  Future<void> addBasicSession(RecitroStore store, String name) =>
+      store.addSession(
+        name: name,
+        pointsPerAnswer: 5,
+        pointsRequiredForReward: 10,
+        rewardLabel: 'Sticker',
+        allowRecallUnanswered: false,
+        allowRecallAnswered: false,
+      );
+
+  test('students not called last session get priority and go first',
+      () async {
+    final store = RecitroStore();
+    await store.addStudent('Ann');
+    await store.addStudent('Ben');
+    await store.addStudent('Cy');
+    await addBasicSession(store, 'Day 1');
+    final day1 = store.sessions.first;
+    final ann = store.students[0].id;
+    final ben = store.students[1].id;
+    final cy = store.students[2].id;
+
+    // Only Ann is called on day 1.
+    await store.callStudent(day1, ann);
+    await store.markAnswered(day1);
+
+    expect(store.studentsMissedInLatestSession().map((s) => s.id),
+        unorderedEquals([ben, cy]));
+
+    await addBasicSession(store, 'Day 2');
+    final day2 = store.sessions.last;
+    expect(day2.previousSessionName, 'Day 1');
+    expect(store.isPriority(day2, ann), isFalse);
+    expect(store.isPriority(day2, ben), isTrue);
+    expect(store.isPriority(day2, cy), isTrue);
+
+    // The first two random picks must be the priority students.
+    final first = await store.pickRandomStudent(day2);
+    await store.markAnswered(day2);
+    final second = await store.pickRandomStudent(day2);
+    await store.markAnswered(day2);
+    expect([first, second], unorderedEquals([ben, cy]));
+    expect(await store.pickRandomStudent(day2), ann);
+  });
+
+  test('skipping keeps the student waiting and carries priority', () async {
+    final store = RecitroStore();
+    await store.addStudent('Ann');
+    await addBasicSession(store, 'Day 1');
+    final day1 = store.sessions.first;
+    final ann = store.students.first.id;
+
+    await store.pickRandomStudent(day1);
+    await store.skipCall(day1);
+    expect(day1.pendingStudentId, isNull);
+    expect(day1.studentStates[ann]!.outcome, CallOutcome.notCalled);
+    expect(store.hasCallableStudents(day1), isTrue);
+
+    await addBasicSession(store, 'Day 2');
+    expect(store.isPriority(store.sessions.last, ann), isTrue);
+  });
+
+  test('teacher sets the score and can rename the reward', () async {
+    final store = RecitroStore();
+    await store.addStudent('Ann');
+    await addBasicSession(store, 'Quiz');
+    final s = store.sessions.first;
+    final ann = store.students.first.id;
+
+    await store.callStudent(s, ann);
+    await store.markAnswered(s, points: 12);
+    expect(s.studentStates[ann]!.pointsEarned, 12);
+    expect(store.canClaimReward(s, ann), isTrue);
+
+    await store.claimReward(s, ann, rewardLabel: 'Extra recess');
+    expect(store.ledgerForStudent(ann).single.rewardLabel, 'Extra recess');
+    expect(store.ledgerForStudent(ann).single.points, 12);
+  });
+
+  test('zero points records an answer without progress', () async {
+    final store = RecitroStore();
+    await store.addStudent('Ann');
+    await addBasicSession(store, 'Quiz');
+    final s = store.sessions.first;
+    final ann = store.students.first.id;
+
+    await store.callStudent(s, ann);
+    await store.markAnswered(s, points: 0);
+    expect(s.studentStates[ann]!.outcome, CallOutcome.answered);
+    expect(s.studentStates[ann]!.pointsEarned, 0);
+  });
+
   test('answered recall uses lower pick weight', () async {
     final store = RecitroStore();
     await store.addStudent('A');

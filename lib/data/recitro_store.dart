@@ -18,11 +18,15 @@ class RecitroStore extends ChangeNotifier {
   static const _uuid = Uuid();
   static const int primaryPickWeight = 10;
   static const int answeredRecallPickWeight = 2;
+  static const int maxPointsPerCall = 999;
+
   final List<Student> _students = [];
   final List<RecitationSession> _sessions = [];
   final List<PointLedgerEntry> _ledger = [];
 
   List<Student> get students => List.unmodifiable(_students);
+
+  /// Sessions in creation order (oldest first).
   List<RecitationSession> get sessions => List.unmodifiable(_sessions);
   List<PointLedgerEntry> get ledger => List.unmodifiable(_ledger);
 
@@ -59,6 +63,8 @@ class RecitroStore extends ChangeNotifier {
     return list;
   }
 
+  // ---------------------------------------------------------------- students
+
   Future<void> addStudent(String name) async {
     final student = Student(id: _uuid.v4(), name: name.trim());
     _students.add(student);
@@ -91,7 +97,22 @@ class RecitroStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addSession({
+  // ---------------------------------------------------------------- sessions
+
+  /// Students who were not called in the most recent session. They get
+  /// priority when the next session is created.
+  List<Student> studentsMissedInLatestSession() {
+    if (_sessions.isEmpty) return const [];
+    final latest = _sessions.last;
+    return _students.where((s) {
+      final state = latest.studentStates[s.id];
+      return state != null &&
+          (state.outcome == CallOutcome.notCalled ||
+              state.outcome == CallOutcome.pending);
+    }).toList(growable: false);
+  }
+
+  Future<RecitationSession> addSession({
     required String name,
     required int pointsPerAnswer,
     required int pointsRequiredForReward,
@@ -99,22 +120,52 @@ class RecitroStore extends ChangeNotifier {
     required bool allowRecallUnanswered,
     required bool allowRecallAnswered,
   }) async {
+    final previous = _sessions.isEmpty ? null : _sessions.last;
+    final missed = studentsMissedInLatestSession().map((s) => s.id).toSet();
+
     final states = <String, StudentSessionState>{};
     for (final student in _students) {
-      states[student.id] = StudentSessionState(studentId: student.id);
+      states[student.id] = StudentSessionState(
+        studentId: student.id,
+        priority: missed.contains(student.id),
+      );
     }
-    _sessions.add(
-      RecitationSession(
-        id: _uuid.v4(),
-        name: name.trim(),
-        pointsPerAnswer: pointsPerAnswer,
-        pointsRequiredForReward: pointsRequiredForReward,
-        rewardLabel: rewardLabel.trim(),
-        allowRecallUnanswered: allowRecallUnanswered,
-        allowRecallAnswered: allowRecallAnswered,
-        studentStates: states,
-      ),
+    final session = RecitationSession(
+      id: _uuid.v4(),
+      name: name.trim(),
+      pointsPerAnswer: pointsPerAnswer,
+      pointsRequiredForReward: pointsRequiredForReward,
+      rewardLabel: rewardLabel.trim(),
+      allowRecallUnanswered: allowRecallUnanswered,
+      allowRecallAnswered: allowRecallAnswered,
+      studentStates: states,
+      createdAt: DateTime.now(),
+      previousSessionName: missed.isEmpty ? null : previous?.name,
     );
+    _sessions.add(session);
+    await _save();
+    notifyListeners();
+    return session;
+  }
+
+  Future<void> updateSession(
+    String sessionId, {
+    required String name,
+    required int pointsPerAnswer,
+    required int pointsRequiredForReward,
+    required String rewardLabel,
+    required bool allowRecallUnanswered,
+    required bool allowRecallAnswered,
+  }) async {
+    final session = sessionById(sessionId);
+    if (session == null) return;
+    session
+      ..name = name.trim()
+      ..pointsPerAnswer = pointsPerAnswer
+      ..pointsRequiredForReward = pointsRequiredForReward
+      ..rewardLabel = rewardLabel.trim()
+      ..allowRecallUnanswered = allowRecallUnanswered
+      ..allowRecallAnswered = allowRecallAnswered;
     await _save();
     notifyListeners();
   }
@@ -123,6 +174,16 @@ class RecitroStore extends ChangeNotifier {
     _sessions.removeWhere((s) => s.id == sessionId);
     await _save();
     notifyListeners();
+  }
+
+  // ----------------------------------------------------------------- calling
+
+  /// Priority = missed last session and still waiting in this one.
+  bool isPriority(RecitationSession session, String studentId) {
+    final state = session.studentStates[studentId];
+    return state != null &&
+        state.priority &&
+        state.outcome == CallOutcome.notCalled;
   }
 
   int pickWeightForStudent(RecitationSession session, Student student) {
@@ -153,6 +214,23 @@ class RecitroStore extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  int calledCount(RecitationSession session) {
+    var n = 0;
+    for (final student in _students) {
+      final outcome = session.studentStates[student.id]?.outcome;
+      if (outcome == CallOutcome.answered ||
+          outcome == CallOutcome.notAnswered) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  int priorityWaitingCount(RecitationSession session) =>
+      _students.where((s) => isPriority(session, s.id)).length;
+
+  /// Picks the next student at random. Students who missed the previous
+  /// session are always picked before anyone else.
   Future<String?> pickRandomStudent(RecitationSession session) async {
     if (session.pendingStudentId != null) return null;
     final weights = <Student, int>{};
@@ -162,37 +240,76 @@ class RecitroStore extends ChangeNotifier {
     }
     if (weights.isEmpty) return null;
 
-    final total = weights.values.fold<int>(0, (a, b) => a + b);
+    final priority =
+        weights.keys.where((s) => isPriority(session, s.id)).toList();
+    final pool = priority.isNotEmpty
+        ? {for (final s in priority) s: 1}
+        : weights;
+
+    final total = pool.values.fold<int>(0, (a, b) => a + b);
     var roll = Random().nextInt(total);
     Student? picked;
-    for (final entry in weights.entries) {
+    for (final entry in pool.entries) {
       roll -= entry.value;
       if (roll < 0) {
         picked = entry.key;
         break;
       }
     }
-    picked ??= weights.keys.first;
+    picked ??= pool.keys.first;
 
-    final state = session.studentStates[picked.id];
-    if (state == null) return null;
-    if (state.outcome == CallOutcome.answered) {
-      state.rewardClaimed = false;
-    }
-    state.outcome = CallOutcome.pending;
-    session.pendingStudentId = picked.id;
-    await _save();
-    notifyListeners();
-    return picked.id;
+    return await _beginCall(session, picked.id) ? picked.id : null;
   }
 
-  Future<void> markAnswered(RecitationSession session) async {
+  /// The teacher calls a specific student, regardless of recall rules.
+  Future<bool> callStudent(RecitationSession session, String studentId) =>
+      _beginCall(session, studentId);
+
+  Future<bool> _beginCall(RecitationSession session, String studentId) async {
+    if (session.pendingStudentId != null) return false;
+    final state = session.studentStates[studentId];
+    if (state == null) return false;
+    state.outcomeBeforeCall = state.outcome;
+    state.outcome = CallOutcome.pending;
+    session.pendingStudentId = studentId;
+    await _save();
+    notifyListeners();
+    return true;
+  }
+
+  /// The teacher decides this student does not answer now. They go back to
+  /// where they were, so a waiting student stays in the queue (and keeps
+  /// priority for the next session if never called).
+  Future<void> skipCall(RecitationSession session) async {
+    final id = session.pendingStudentId;
+    if (id == null) return;
+    final state = session.studentStates[id];
+    if (state != null) {
+      state.outcome = state.outcomeBeforeCall ?? CallOutcome.notCalled;
+      state.outcomeBeforeCall = null;
+    }
+    session.pendingStudentId = null;
+    await _save();
+    notifyListeners();
+  }
+
+  /// Records an answer. [points] is the score the teacher gives; it defaults
+  /// to the session's points per answer.
+  Future<void> markAnswered(RecitationSession session, {int? points}) async {
     final id = session.pendingStudentId;
     if (id == null) return;
     final state = session.studentStates[id];
     if (state == null) return;
+    final awarded =
+        (points ?? session.pointsPerAnswer).clamp(0, maxPointsPerCall);
+    if (state.rewardClaimed) {
+      // Starting toward a new reward after a previous claim.
+      state.rewardClaimed = false;
+      state.pointsEarned = 0;
+    }
     state.outcome = CallOutcome.answered;
-    state.pointsEarned += session.pointsPerAnswer;
+    state.outcomeBeforeCall = null;
+    state.pointsEarned += awarded;
     session.pendingStudentId = null;
     await _save();
     notifyListeners();
@@ -204,10 +321,13 @@ class RecitroStore extends ChangeNotifier {
     final state = session.studentStates[id];
     if (state == null) return;
     state.outcome = CallOutcome.notAnswered;
+    state.outcomeBeforeCall = null;
     session.pendingStudentId = null;
     await _save();
     notifyListeners();
   }
+
+  // ----------------------------------------------------------------- rewards
 
   bool canClaimReward(RecitationSession session, String studentId) {
     final state = session.studentStates[studentId];
@@ -223,10 +343,21 @@ class RecitroStore extends ChangeNotifier {
         .clamp(0, session.pointsRequiredForReward);
   }
 
-  Future<bool> claimReward(RecitationSession session, String studentId) async {
+  /// Number of sessions where [studentId] has a reward ready to hand out.
+  int claimableRewardCount(String studentId) =>
+      _sessions.where((s) => canClaimReward(s, studentId)).length;
+
+  /// Gives the reward. The teacher may change what the reward is with
+  /// [rewardLabel]; otherwise the session's reward is used.
+  Future<bool> claimReward(
+    RecitationSession session,
+    String studentId, {
+    String? rewardLabel,
+  }) async {
     final state = session.studentStates[studentId];
     if (state == null || !canClaimReward(session, studentId)) return false;
 
+    final label = rewardLabel?.trim();
     final payout = state.pointsEarned;
     state.rewardClaimed = true;
     state.pointsEarned = 0;
@@ -237,7 +368,8 @@ class RecitroStore extends ChangeNotifier {
         sessionId: session.id,
         sessionName: session.name,
         points: payout,
-        rewardLabel: session.rewardLabel,
+        rewardLabel:
+            (label == null || label.isEmpty) ? session.rewardLabel : label,
         earnedAt: DateTime.now(),
       ),
     );
@@ -245,6 +377,8 @@ class RecitroStore extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  // --------------------------------------------------------------- storage
 
   Future<File> _dataFile() async {
     final dir = await getApplicationDocumentsDirectory();

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/recitro_store.dart';
+import '../flows/session_form_screen.dart';
+import '../flows/student_create_flow.dart';
 import '../models/recitation_session.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ui.dart';
 import 'session_detail_screen.dart';
 
 class SessionsTab extends StatelessWidget {
@@ -10,151 +14,160 @@ class SessionsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final sessions = context.watch<RecitroStore>().sessions;
+    final store = context.watch<RecitroStore>();
+    // Newest first.
+    final sessions = store.sessions.reversed.toList(growable: false);
+    final missed = store.studentsMissedInLatestSession().length;
 
     return CustomScrollView(
       slivers: [
-        SliverAppBar(
-          floating: true,
-          title: const Text('Sessions'),
+        SliverToBoxAdapter(
+          child: PageTitle(
+            title: 'Sessions',
+            subtitle: sessions.isEmpty
+                ? 'Run a recitation and call students one by one.'
+                : '${sessions.length} ${sessions.length == 1 ? 'session' : 'sessions'} · newest first',
+          ),
         ),
         if (sessions.isEmpty)
           SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.inbox_rounded, size: 64, color: Colors.black26),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No sessions yet',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap Add in the sidebar',
-                    style: TextStyle(color: scheme.outline),
-                  ),
-                ],
-              ),
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.auto_stories_rounded,
+              title: 'No sessions yet',
+              message: store.students.isEmpty
+                  ? 'Add your students first, then start a session.'
+                  : 'Start a session to begin calling students.',
+              action: store.students.isEmpty
+                  ? FilledButton.icon(
+                      onPressed: () => showStudentCreateFlow(context),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Add students'),
+                    )
+                  : FilledButton.icon(
+                      onPressed: () => openSessionForm(context),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('New session'),
+                    ),
             ),
           )
-        else
+        else ...[
+          if (missed > 0)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                Space.page,
+                Space.md,
+                Space.page,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: NoticeCard(
+                  icon: Icons.flag_rounded,
+                  title: '$missed ${missed == 1 ? 'student hasn\'t' : 'students haven\'t'} been called yet',
+                  message:
+                      'In "${sessions.first.name}". If you start a new session, they will be called first.',
+                ),
+              ),
+            ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            padding: const EdgeInsets.fromLTRB(
+              Space.page,
+              Space.lg,
+              Space.page,
+              96,
+            ),
             sliver: SliverList.separated(
               itemCount: sessions.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final session = sessions[index];
-                return _SessionCard(session: session);
-              },
+              separatorBuilder: (_, _) => const SizedBox(height: Space.md),
+              itemBuilder: (context, index) => _SessionCard(
+                session: sessions[index],
+                isLatest: index == 0,
+              ),
             ),
           ),
+        ],
       ],
     );
   }
 }
 
 class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.session});
+  const _SessionCard({required this.session, required this.isLatest});
 
   final RecitationSession session;
+  final bool isLatest;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: scheme.primary.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(20),
+    final store = context.watch<RecitroStore>();
+    final text = Theme.of(context).textTheme;
+    final total = store.students.length;
+    final called = store.calledCount(session);
+    final priority = store.priorityWaitingCount(session);
+    final done = total > 0 && called >= total;
+
+    return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => SessionDetailScreen(sessionId: session.id),
-            ),
-          );
-        },
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => SessionDetailScreen(sessionId: session.id),
+          ),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
+          padding: const EdgeInsets.all(Space.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [scheme.primary, scheme.tertiary],
-                  ),
-                ),
-                child: const Icon(Icons.mic_rounded, color: Colors.white),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
                       session.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                      ),
+                      style: text.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.military_tech_outlined,
-                            size: 16, color: scheme.tertiary),
-                        const SizedBox(width: 4),
-                        Text(session.rewardLabel,
-                            style: TextStyle(color: scheme.tertiary)),
-                        const SizedBox(width: 12),
-                        Icon(Icons.stars_rounded,
-                            size: 16, color: scheme.secondary),
-                        Text(
-                          '+${session.pointsPerAnswer}/answer',
-                          style: TextStyle(color: scheme.secondary),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${session.pointsRequiredForReward} to claim',
-                          style: TextStyle(
-                            color: scheme.outline,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (session.allowRecallUnanswered ||
-                        session.allowRecallAnswered) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (session.allowRecallUnanswered)
-                            Chip(
-                              visualDensity: VisualDensity.compact,
-                              label: const Text('Recall unanswered'),
-                            ),
-                          if (session.allowRecallAnswered)
-                            Chip(
-                              visualDensity: VisualDensity.compact,
-                              label: const Text('Low-chance recall answered'),
-                            ),
-                        ],
-                      ),
-                    ],
+                  ),
+                  if (isLatest) ...[
+                    const SizedBox(width: Space.sm),
+                    const Pill(label: 'Latest', color: AppColors.teal),
                   ],
-                ),
+                  const SizedBox(width: Space.xs),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                  ),
+                ],
               ),
-              Icon(Icons.chevron_right_rounded, color: scheme.primary),
+              const SizedBox(height: Space.xs),
+              Text(
+                '${session.rewardLabel} · ${session.pointsPerAnswer} pts per answer · ${session.pointsRequiredForReward} to earn',
+                style: text.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: Space.md),
+              PointsProgress(earned: called, required: total == 0 ? 1 : total),
+              const SizedBox(height: Space.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      done ? 'Everyone called' : '$called of $total called',
+                      style:
+                          text.labelMedium?.copyWith(color: AppColors.muted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (priority > 0)
+                    Pill(
+                      label: '$priority priority',
+                      color: AppColors.navy,
+                      icon: Icons.flag_rounded,
+                    ),
+                ],
+              ),
             ],
           ),
         ),

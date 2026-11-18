@@ -10,6 +10,8 @@ class RecitationSession {
     required this.allowRecallUnanswered,
     required this.allowRecallAnswered,
     required this.studentStates,
+    required this.createdAt,
+    this.previousSessionName,
     this.pendingStudentId,
   });
 
@@ -21,6 +23,10 @@ class RecitationSession {
   bool allowRecallUnanswered;
   bool allowRecallAnswered;
   Map<String, StudentSessionState> studentStates;
+  DateTime createdAt;
+
+  /// Name of the session that priority students were carried over from.
+  String? previousSessionName;
   String? pendingStudentId;
 
   Map<String, dynamic> toJson() => {
@@ -31,6 +37,8 @@ class RecitationSession {
         'rewardLabel': rewardLabel,
         'allowRecallUnanswered': allowRecallUnanswered,
         'allowRecallAnswered': allowRecallAnswered,
+        'createdAt': createdAt.toIso8601String(),
+        'previousSessionName': previousSessionName,
         'pendingStudentId': pendingStudentId,
         'studentStates': studentStates.map(
           (key, value) => MapEntry(key, value.toJson()),
@@ -47,6 +55,9 @@ class RecitationSession {
         rewardLabel: (json['rewardLabel'] as String?) ?? 'Reward',
         allowRecallUnanswered: json['allowRecallUnanswered'] as bool,
         allowRecallAnswered: json['allowRecallAnswered'] as bool? ?? false,
+        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        previousSessionName: json['previousSessionName'] as String?,
         pendingStudentId: json['pendingStudentId'] as String?,
         studentStates: (json['studentStates'] as Map<String, dynamic>).map(
           (key, value) => MapEntry(
