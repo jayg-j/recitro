@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../data/recitro_store.dart';
 import '../flows/session_form_screen.dart';
+import '../flows/student_create_flow.dart';
 import '../models/call_outcome.dart';
 import '../models/recitation_session.dart';
 import '../models/student.dart';
@@ -13,9 +14,19 @@ import '../widgets/ui.dart';
 import 'student_detail_screen.dart';
 
 class SessionDetailScreen extends StatefulWidget {
-  const SessionDetailScreen({super.key, required this.sessionId});
+  const SessionDetailScreen({
+    super.key,
+    required this.sessionId,
+    this.embedded = false,
+    this.onClosed,
+  });
 
   final String sessionId;
+
+  /// Shown inside the tablet side-by-side layout rather than as its own
+  /// page: no back button, and deleting calls [onClosed] instead of popping.
+  final bool embedded;
+  final VoidCallback? onClosed;
 
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
@@ -23,10 +34,18 @@ class SessionDetailScreen extends StatefulWidget {
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
   bool _dialogOpen = false;
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _search.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Resume a call that was in progress when the app closed.
       final pending = context
@@ -84,7 +103,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
     if (!ok || !mounted) return;
     final store = context.read<RecitroStore>();
-    Navigator.of(context).pop();
+    if (widget.embedded) {
+      widget.onClosed?.call();
+    } else {
+      Navigator.of(context).pop();
+    }
     await store.deleteSession(session.id);
   }
 
@@ -166,11 +189,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
 
-    final students = store.students;
+    final students = store.studentsFor(session);
+    final course = store.courseById(session.courseId);
+    final query = _search.text;
     final priority = <Student>[];
     final waiting = <Student>[];
     final called = <Student>[];
     for (final s in students) {
+      if (!matchesQuery(query, [s.name])) continue;
       final outcome =
           session.studentStates[s.id]?.outcome ?? CallOutcome.notCalled;
       if (outcome == CallOutcome.notCalled ||
@@ -183,8 +209,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
     final canCall = store.hasCallableStudents(session);
 
+    final noMatches =
+        priority.isEmpty && waiting.isEmpty && called.isEmpty;
+
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         title: Text(session.name),
         actions: [
           IconButton(
@@ -216,9 +246,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               ),
             ),
       body: students.isEmpty
-          ? const EmptyState(
+          ? EmptyState(
               title: 'No students yet',
-              message: 'Add students from the Students tab to start calling.',
+              message: 'Add the students in ${course?.name ?? 'this course'} '
+                  'to start calling.',
+              action: FilledButton(
+                onPressed: () => showStudentCreateFlow(
+                  context,
+                  courseId: session.courseId,
+                ),
+                child: const Text('Add students'),
+              ),
             )
           : ContentWidth(
               child: ListView(
@@ -226,9 +264,39 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 children: [
                   _Summary(
                     session: session,
+                    courseName: course?.name,
                     called: store.calledCount(session),
                     total: students.length,
                   ),
+                  if (students.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.page,
+                        Space.md,
+                        Space.page,
+                        0,
+                      ),
+                      child: SearchField(
+                        key: const Key('studentSearch'),
+                        controller: _search,
+                        hint: 'Search students',
+                      ),
+                    ),
+                  if (noMatches)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.page,
+                        Space.xl,
+                        Space.page,
+                        0,
+                      ),
+                      child: Text(
+                        'No students match "${query.trim()}".',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: context.palette.muted,
+                            ),
+                      ),
+                    ),
                   if (priority.isNotEmpty) ...[
                     SectionHeader(
                       'Priority',
@@ -266,17 +334,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 class _Summary extends StatelessWidget {
   const _Summary({
     required this.session,
+    required this.courseName,
     required this.called,
     required this.total,
   });
 
   final RecitationSession session;
+  final String? courseName;
   final int called;
   final int total;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final where = [
+      if (courseName != null) courseName!,
+      if (session.subject.isNotEmpty) session.subject,
+    ].join(' · ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.page, Space.sm, Space.page, 0),
       child: Card(
@@ -285,6 +359,10 @@ class _Summary extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (where.isNotEmpty) ...[
+                Text(where, style: text.titleSmall),
+                const SizedBox(height: Space.md),
+              ],
               Text('Reward', style: text.bodySmall),
               Text(session.rewardLabel, style: text.titleMedium),
               const SizedBox(height: Space.lg),

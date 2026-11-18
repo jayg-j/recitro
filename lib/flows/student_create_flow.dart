@@ -12,20 +12,32 @@ Future<void> showStudentCreateFlow(
   BuildContext context, {
   Student? student,
   bool paste = false,
+  String? courseId,
 }) {
   return showDialog<void>(
     context: context,
-    builder: (_) => _StudentDialog(student: student, startWithPaste: paste),
+    builder: (_) => _StudentDialog(
+      student: student,
+      startWithPaste: paste,
+      courseId: courseId,
+    ),
   );
 }
 
 enum _Mode { single, paste }
 
 class _StudentDialog extends StatefulWidget {
-  const _StudentDialog({this.student, this.startWithPaste = false});
+  const _StudentDialog({
+    this.student,
+    this.startWithPaste = false,
+    this.courseId,
+  });
 
   final Student? student;
   final bool startWithPaste;
+
+  /// Course new students join (defaults to the first course).
+  final String? courseId;
 
   @override
   State<_StudentDialog> createState() => _StudentDialogState();
@@ -62,7 +74,7 @@ class _StudentDialogState extends State<_StudentDialog> {
     if (_renaming) {
       await store.updateStudent(widget.student!.id, _name.text);
     } else {
-      await store.addStudent(_name.text);
+      await store.addStudent(_name.text, courseId: widget.courseId);
       setState(() => _added++);
     }
     return true;
@@ -70,7 +82,9 @@ class _StudentDialogState extends State<_StudentDialog> {
 
   Future<void> _submitList(ParsedNames parsed) async {
     if (parsed.names.isEmpty) return;
-    await context.read<RecitroStore>().addStudents(parsed.names);
+    await context
+        .read<RecitroStore>()
+        .addStudents(parsed.names, courseId: widget.courseId);
     if (!mounted) return;
     final n = parsed.names.length;
     final messenger = ScaffoldMessenger.of(context);
@@ -86,7 +100,10 @@ class _StudentDialogState extends State<_StudentDialog> {
     final store = context.watch<RecitroStore>();
     final parsed = parseNameList(
       _list.text,
-      existing: store.students.map((s) => s.name),
+      existing: (widget.courseId == null
+              ? store.students
+              : store.studentsInCourse(widget.courseId!))
+          .map((s) => s.name),
     );
     final paste = !_renaming && _mode == _Mode.paste;
 

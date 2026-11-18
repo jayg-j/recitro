@@ -163,6 +163,53 @@ class PageTitle extends StatelessWidget {
   }
 }
 
+/// Compact search box with a clear button.
+class SearchField extends StatelessWidget {
+  const SearchField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.autofocus = false,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) => TextField(
+        controller: controller,
+        autofocus: autofocus,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: hint,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          prefixIcon: Icon(Icons.search_rounded, color: p.muted, size: 20),
+          suffixIcon: value.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear',
+                  icon: Icon(Icons.close_rounded, color: p.muted, size: 18),
+                  onPressed: controller.clear,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Case- and space-insensitive "contains" for search boxes.
+bool matchesQuery(String query, Iterable<String> fields) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return true;
+  return fields.any((f) => f.toLowerCase().contains(q));
+}
+
 /// A card that holds a list of rows separated by hairlines.
 class GroupCard extends StatelessWidget {
   const GroupCard({super.key, required this.children, this.indent = 68});

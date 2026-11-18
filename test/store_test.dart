@@ -143,7 +143,7 @@ void main() {
     await store.callStudent(day1, ann);
     await store.markAnswered(day1);
 
-    expect(store.studentsMissedInLatestSession().map((s) => s.id),
+    expect(store.studentsMissedInLatestSession(store.courses.first.id).map((s) => s.id),
         unorderedEquals([ben, cy]));
 
     await addBasicSession(store, 'Day 2');

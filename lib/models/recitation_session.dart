@@ -11,6 +11,8 @@ class RecitationSession {
     required this.allowRecallAnswered,
     required this.studentStates,
     required this.createdAt,
+    this.courseId = '',
+    this.subject = '',
     this.previousSessionName,
     this.pendingStudentId,
   });
@@ -25,6 +27,12 @@ class RecitationSession {
   Map<String, StudentSessionState> studentStates;
   DateTime createdAt;
 
+  /// Course the session is for; only its students take part.
+  String courseId;
+
+  /// Subject within the course (may be empty).
+  String subject;
+
   /// Name of the session that priority students were carried over from.
   String? previousSessionName;
   String? pendingStudentId;
@@ -38,6 +46,8 @@ class RecitationSession {
         'allowRecallUnanswered': allowRecallUnanswered,
         'allowRecallAnswered': allowRecallAnswered,
         'createdAt': createdAt.toIso8601String(),
+        'courseId': courseId,
+        'subject': subject,
         'previousSessionName': previousSessionName,
         'pendingStudentId': pendingStudentId,
         'studentStates': studentStates.map(
@@ -58,6 +68,8 @@ class RecitationSession {
         createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0),
         previousSessionName: json['previousSessionName'] as String?,
+        courseId: json['courseId'] as String? ?? '',
+        subject: json['subject'] as String? ?? '',
         pendingStudentId: json['pendingStudentId'] as String?,
         studentStates: (json['studentStates'] as Map<String, dynamic>).map(
           (key, value) => MapEntry(

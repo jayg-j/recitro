@@ -148,6 +148,9 @@ extension PaletteContext on BuildContext {
 }
 
 abstract final class AppTheme {
+  /// Bundled typeface (assets/fonts, SIL Open Font License).
+  static const fontFamily = 'PlusJakartaSans';
+
   static ThemeData light() => _build(AppPalette.light, Brightness.light);
   static ThemeData dark() => _build(AppPalette.dark, Brightness.dark);
 
@@ -175,10 +178,13 @@ abstract final class AppTheme {
       onInverseSurface: p.background,
     );
 
-    // Merge onto the platform typography so every style carries the system
-    // font family (Roboto on Android, SF on iOS) — including styles passed
-    // directly to buttons and app bars.
-    final base = ThemeData(useMaterial3: true, brightness: brightness);
+    // Build the base typography with the app font so every style carries
+    // it — including styles passed directly to buttons and app bars.
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      fontFamily: fontFamily,
+    );
     final text = base.textTheme.merge(_textTheme(p));
     final line = BorderSide(color: p.line);
 
@@ -186,6 +192,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
+      fontFamily: fontFamily,
       textTheme: text,
       extensions: [p],
       scaffoldBackgroundColor: p.background,
@@ -386,30 +393,35 @@ abstract final class AppTheme {
         color: ink,
       ),
       titleMedium: TextStyle(
+        letterSpacing: 0,
         fontSize: 16,
         height: 1.35,
         fontWeight: FontWeight.w600,
         color: ink,
       ),
       titleSmall: TextStyle(
+        letterSpacing: 0,
         fontSize: 14,
         height: 1.35,
         fontWeight: FontWeight.w600,
         color: ink,
       ),
       bodyLarge: TextStyle(
+        letterSpacing: 0,
         fontSize: 16,
         height: 1.5,
         fontWeight: FontWeight.w400,
         color: ink,
       ),
       bodyMedium: TextStyle(
+        letterSpacing: 0,
         fontSize: 14,
         height: 1.45,
         fontWeight: FontWeight.w400,
         color: ink,
       ),
       bodySmall: TextStyle(
+        letterSpacing: 0,
         fontSize: 13,
         height: 1.4,
         fontWeight: FontWeight.w400,
@@ -419,13 +431,13 @@ abstract final class AppTheme {
         fontSize: 15,
         height: 1.2,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.1,
+        letterSpacing: 0,
       ),
       labelMedium: const TextStyle(
         fontSize: 12,
         height: 1.2,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.2,
+        letterSpacing: 0.1,
       ),
       labelSmall: TextStyle(
         fontSize: 11,

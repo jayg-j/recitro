@@ -4,19 +4,27 @@ import 'package:recitro/data/recitro_store.dart';
 import 'package:recitro/main.dart';
 
 void main() {
-  Future<void> openStudents(WidgetTester tester, RecitroStore store) async {
+  /// Opens Courses → the course page.
+  Future<void> openCourse(
+    WidgetTester tester,
+    RecitroStore store,
+    String course,
+  ) async {
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(RecitroApp(store: store));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Students').last);
+    await tester.tap(find.text('Courses').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(course));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('paste a list from the empty Students page', (tester) async {
+  testWidgets('paste a list into an empty course', (tester) async {
     final store = RecitroStore(persist: false);
-    await openStudents(tester, store);
+    final course = await store.addCourse('BSIT 2-A');
+    await openCourse(tester, store, 'BSIT 2-A');
 
     await tester.tap(find.text('Paste a list'));
     await tester.pumpAndSettle();
@@ -29,18 +37,21 @@ void main() {
 
     await tester.tap(find.byKey(const Key('addList')));
     await tester.pumpAndSettle();
-    expect(store.students.map((s) => s.name),
+    expect(store.studentsInCourse(course.id).map((s) => s.name),
         ['Andrea Santos', 'Benjamin Cruz', 'Carla Reyes']);
     expect(find.text('Added 3 students'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('skips students already in class', (tester) async {
+  testWidgets('skips students already in the course only', (tester) async {
     final store = RecitroStore(persist: false);
-    await store.addStudent('Andrea Santos');
-    await openStudents(tester, store);
+    final a = await store.addCourse('A');
+    final b = await store.addCourse('B');
+    await store.addStudent('Andrea Santos', courseId: a.id);
+    await store.addStudent('Benjamin Cruz', courseId: b.id);
+    await openCourse(tester, store, 'A');
 
-    await tester.tap(find.byKey(const Key('addStudentFab')));
+    await tester.tap(find.byKey(const Key('addStudents')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Paste a list'));
     await tester.pumpAndSettle();
@@ -49,16 +60,19 @@ void main() {
       'andrea santos\nBenjamin Cruz',
     );
     await tester.pumpAndSettle();
+    // Benjamin is in course B, so he's new for course A.
     expect(find.text('1 new student · 1 already in class'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('addList')));
     await tester.pumpAndSettle();
-    expect(store.students.length, 2);
+    expect(store.studentsInCourse(a.id).length, 2);
+    expect(store.studentsInCourse(b.id).length, 1);
   });
 
   testWidgets('add is disabled until there is a name', (tester) async {
     final store = RecitroStore(persist: false);
-    await openStudents(tester, store);
+    await store.addCourse('A');
+    await openCourse(tester, store, 'A');
     await tester.tap(find.text('Paste a list'));
     await tester.pumpAndSettle();
 

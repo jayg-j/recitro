@@ -7,10 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/call_outcome.dart';
+import '../models/course.dart';
 import '../models/point_ledger_entry.dart';
 import '../models/recitation_session.dart';
 import '../models/student.dart';
 import '../models/student_session_state.dart';
+import 'name_list.dart';
 
 class RecitroStore extends ChangeNotifier {
   RecitroStore({this.persist = true});
@@ -23,10 +25,18 @@ class RecitroStore extends ChangeNotifier {
   static const int answeredRecallPickWeight = 2;
   static const int maxPointsPerCall = 999;
 
+  /// Name of the course created for data saved before courses existed, and
+  /// for callers that don't pick a course.
+  static const defaultCourseName = 'My class';
+
+  final List<Course> _courses = [];
   final List<Student> _students = [];
   final List<RecitationSession> _sessions = [];
   final List<PointLedgerEntry> _ledger = [];
 
+  List<Course> get courses => List.unmodifiable(_courses);
+
+  /// All students across courses.
   List<Student> get students => List.unmodifiable(_students);
 
   /// Sessions in creation order (oldest first).
@@ -36,6 +46,13 @@ class RecitroStore extends ChangeNotifier {
   Future<void> init() async {
     if (!persist) return;
     await _load();
+  }
+
+  Course? courseById(String id) {
+    for (final c in _courses) {
+      if (c.id == id) return c;
+    }
+    return null;
   }
 
   Student? studentById(String id) {
@@ -52,6 +69,17 @@ class RecitroStore extends ChangeNotifier {
     return null;
   }
 
+  /// Students in [courseId], in the order they were added.
+  List<Student> studentsInCourse(String courseId) =>
+      _students.where((s) => s.courseId == courseId).toList(growable: false);
+
+  /// Students taking part in [session] (its course's students).
+  List<Student> studentsFor(RecitationSession session) =>
+      studentsInCourse(session.courseId);
+
+  List<RecitationSession> sessionsInCourse(String courseId) =>
+      _sessions.where((s) => s.courseId == courseId).toList(growable: false);
+
   int totalPointsForStudent(String studentId) {
     var sum = 0;
     for (final e in _ledger) {
@@ -67,29 +95,127 @@ class RecitroStore extends ChangeNotifier {
     return list;
   }
 
-  // ---------------------------------------------------------------- students
+  // ----------------------------------------------------------------- courses
 
-  Future<void> addStudent(String name) async {
-    final student = Student(id: _uuid.v4(), name: name.trim());
-    _students.add(student);
-    for (final session in _sessions) {
-      session.studentStates[student.id] = StudentSessionState(
-        studentId: student.id,
-      );
+  Future<Course> addCourse(String name, {List<String> subjects = const []}) {
+    final course = _newCourse(name, subjects: subjects);
+    return _save().then((_) {
+      notifyListeners();
+      return course;
+    });
+  }
+
+  Course _newCourse(String name, {List<String> subjects = const []}) {
+    final course = Course(
+      id: _uuid.v4(),
+      name: name.trim(),
+      subjects: _cleanSubjects(subjects),
+    );
+    _courses.add(course);
+    return course;
+  }
+
+  /// Finds a course by name (case-insensitive) or creates it.
+  Future<Course> courseNamed(String name) async {
+    final key = nameKey(name);
+    for (final c in _courses) {
+      if (nameKey(c.name) == key) return c;
+    }
+    return addCourse(name);
+  }
+
+  Future<void> renameCourse(String courseId, String name) async {
+    final course = courseById(courseId);
+    if (course == null || name.trim().isEmpty) return;
+    course.name = name.trim();
+    await _save();
+    notifyListeners();
+  }
+
+  /// Deletes a course with its students and sessions. Rewards already given
+  /// stay in the ledger.
+  Future<void> deleteCourse(String courseId) async {
+    _courses.removeWhere((c) => c.id == courseId);
+    _students.removeWhere((s) => s.courseId == courseId);
+    _sessions.removeWhere((s) => s.courseId == courseId);
+    await _save();
+    notifyListeners();
+  }
+
+  Future<void> addSubject(String courseId, String subject) async {
+    final course = courseById(courseId);
+    final name = subject.trim();
+    if (course == null || name.isEmpty) return;
+    if (course.subjects.any((s) => nameKey(s) == nameKey(name))) return;
+    course.subjects.add(name);
+    await _save();
+    notifyListeners();
+  }
+
+  /// Renames a subject in its course and in that course's sessions.
+  Future<void> renameSubject(String courseId, String from, String to) async {
+    final course = courseById(courseId);
+    final name = to.trim();
+    if (course == null || name.isEmpty) return;
+    final i = course.subjects.indexOf(from);
+    if (i < 0) return;
+    course.subjects[i] = name;
+    for (final s in _sessions) {
+      if (s.courseId == courseId && s.subject == from) s.subject = name;
     }
     await _save();
     notifyListeners();
   }
 
-  /// Adds several students at once (one save), e.g. from a pasted list.
-  Future<void> addStudents(Iterable<String> names) async {
+  /// Removes a subject from the course's list. Past sessions keep it.
+  Future<void> removeSubject(String courseId, String subject) async {
+    final course = courseById(courseId);
+    if (course == null) return;
+    course.subjects.remove(subject);
+    await _save();
+    notifyListeners();
+  }
+
+  static List<String> _cleanSubjects(Iterable<String> subjects) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final s in subjects) {
+      final name = s.trim();
+      if (name.isEmpty || !seen.add(nameKey(name))) continue;
+      out.add(name);
+    }
+    return out;
+  }
+
+  /// The course used when a caller doesn't name one: the only course, or a
+  /// "My class" course created on demand.
+  Course _defaultCourse() {
+    if (_courses.isNotEmpty) return _courses.first;
+    return _newCourse(defaultCourseName);
+  }
+
+  // ---------------------------------------------------------------- students
+
+  Future<void> addStudent(String name, {String? courseId}) =>
+      addStudents([name], courseId: courseId);
+
+  /// Adds several students to a course at once (one save), e.g. from a
+  /// pasted list.
+  Future<void> addStudents(Iterable<String> names, {String? courseId}) async {
+    final course =
+        (courseId == null ? null : courseById(courseId)) ?? _defaultCourse();
     var added = false;
     for (final raw in names) {
       final name = raw.trim();
       if (name.isEmpty) continue;
-      final student = Student(id: _uuid.v4(), name: name);
+      final student = Student(
+        id: _uuid.v4(),
+        name: name,
+        courseId: course.id,
+      );
       _students.add(student);
       for (final session in _sessions) {
+        if (session.courseId != course.id) continue;
         session.studentStates[student.id] =
             StudentSessionState(studentId: student.id);
       }
@@ -122,12 +248,25 @@ class RecitroStore extends ChangeNotifier {
 
   // ---------------------------------------------------------------- sessions
 
-  /// Students who were not called in the most recent session. They get
-  /// priority when the next session is created.
-  List<Student> studentsMissedInLatestSession() {
-    if (_sessions.isEmpty) return const [];
-    final latest = _sessions.last;
-    return _students.where((s) {
+  /// The most recent session for the same course and subject.
+  RecitationSession? latestSession(String courseId, String subject) {
+    for (final s in _sessions.reversed) {
+      if (s.courseId == courseId && nameKey(s.subject) == nameKey(subject)) {
+        return s;
+      }
+    }
+    return null;
+  }
+
+  /// Students not called in the latest session of this course and subject.
+  /// They get priority when the next one is created.
+  List<Student> studentsMissedInLatestSession(
+    String courseId, [
+    String subject = '',
+  ]) {
+    final latest = latestSession(courseId, subject);
+    if (latest == null) return const [];
+    return studentsInCourse(courseId).where((s) {
       final state = latest.studentStates[s.id];
       return state != null &&
           (state.outcome == CallOutcome.notCalled ||
@@ -142,12 +281,23 @@ class RecitroStore extends ChangeNotifier {
     required String rewardLabel,
     required bool allowRecallUnanswered,
     required bool allowRecallAnswered,
+    String? courseId,
+    String subject = '',
   }) async {
-    final previous = _sessions.isEmpty ? null : _sessions.last;
-    final missed = studentsMissedInLatestSession().map((s) => s.id).toSet();
+    final course =
+        (courseId == null ? null : courseById(courseId)) ?? _defaultCourse();
+    final subjectName = subject.trim();
+    if (subjectName.isNotEmpty &&
+        !course.subjects.any((s) => nameKey(s) == nameKey(subjectName))) {
+      course.subjects.add(subjectName);
+    }
+    final previous = latestSession(course.id, subjectName);
+    final missed = studentsMissedInLatestSession(course.id, subjectName)
+        .map((s) => s.id)
+        .toSet();
 
     final states = <String, StudentSessionState>{};
-    for (final student in _students) {
+    for (final student in studentsInCourse(course.id)) {
       states[student.id] = StudentSessionState(
         studentId: student.id,
         priority: missed.contains(student.id),
@@ -163,6 +313,8 @@ class RecitroStore extends ChangeNotifier {
       allowRecallAnswered: allowRecallAnswered,
       studentStates: states,
       createdAt: DateTime.now(),
+      courseId: course.id,
+      subject: subjectName,
       previousSessionName: missed.isEmpty ? null : previous?.name,
     );
     _sessions.add(session);
@@ -179,6 +331,7 @@ class RecitroStore extends ChangeNotifier {
     required String rewardLabel,
     required bool allowRecallUnanswered,
     required bool allowRecallAnswered,
+    String? subject,
   }) async {
     final session = sessionById(sessionId);
     if (session == null) return;
@@ -189,6 +342,16 @@ class RecitroStore extends ChangeNotifier {
       ..rewardLabel = rewardLabel.trim()
       ..allowRecallUnanswered = allowRecallUnanswered
       ..allowRecallAnswered = allowRecallAnswered;
+    if (subject != null) {
+      session.subject = subject.trim();
+      final course = courseById(session.courseId);
+      if (course != null &&
+          session.subject.isNotEmpty &&
+          !course.subjects
+              .any((s) => nameKey(s) == nameKey(session.subject))) {
+        course.subjects.add(session.subject);
+      }
+    }
     await _save();
     notifyListeners();
   }
@@ -225,21 +388,21 @@ class RecitroStore extends ChangeNotifier {
 
   bool hasCallableStudents(RecitationSession session) {
     if (session.pendingStudentId != null) return false;
-    for (final student in _students) {
+    for (final student in studentsFor(session)) {
       if (pickWeightForStudent(session, student) > 0) return true;
     }
     return false;
   }
 
   List<Student> eligibleStudents(RecitationSession session) {
-    return _students
+    return studentsFor(session)
         .where((s) => pickWeightForStudent(session, s) > 0)
         .toList(growable: false);
   }
 
   int calledCount(RecitationSession session) {
     var n = 0;
-    for (final student in _students) {
+    for (final student in studentsFor(session)) {
       final outcome = session.studentStates[student.id]?.outcome;
       if (outcome == CallOutcome.answered ||
           outcome == CallOutcome.notAnswered) {
@@ -250,14 +413,14 @@ class RecitroStore extends ChangeNotifier {
   }
 
   int priorityWaitingCount(RecitationSession session) =>
-      _students.where((s) => isPriority(session, s.id)).length;
+      studentsFor(session).where((s) => isPriority(session, s.id)).length;
 
   /// Students the next random pick chooses from, with their weights.
   /// Students who missed the previous session always come first.
   Map<Student, int> pickPool(RecitationSession session) {
     if (session.pendingStudentId != null) return const {};
     final weights = <Student, int>{};
-    for (final student in _students) {
+    for (final student in studentsFor(session)) {
       final w = pickWeightForStudent(session, student);
       if (w > 0) weights[student] = w;
     }
@@ -435,6 +598,12 @@ class RecitroStore extends ChangeNotifier {
     final raw = await file.readAsString();
     if (raw.isEmpty) return;
     final data = jsonDecode(raw) as Map<String, dynamic>;
+    _courses
+      ..clear()
+      ..addAll(
+        (data['courses'] as List<dynamic>? ?? [])
+            .map((e) => Course.fromJson(e as Map<String, dynamic>)),
+      );
     _students
       ..clear()
       ..addAll(
@@ -453,12 +622,35 @@ class RecitroStore extends ChangeNotifier {
         (data['ledger'] as List<dynamic>? ?? [])
             .map((e) => PointLedgerEntry.fromJson(e as Map<String, dynamic>)),
       );
+    if (_migrateToCourses()) await _save();
+  }
+
+  /// Data saved before courses existed has students and sessions without a
+  /// course. Put them all in one "My class" course so nothing is lost.
+  /// Returns true if anything changed.
+  bool _migrateToCourses() {
+    final orphanStudents = _students.where(
+      (s) => s.courseId.isEmpty || courseById(s.courseId) == null,
+    );
+    final orphanSessions = _sessions.where(
+      (s) => s.courseId.isEmpty || courseById(s.courseId) == null,
+    );
+    if (orphanStudents.isEmpty && orphanSessions.isEmpty) return false;
+    final course = _defaultCourse();
+    for (final s in orphanStudents.toList()) {
+      s.courseId = course.id;
+    }
+    for (final s in orphanSessions.toList()) {
+      s.courseId = course.id;
+    }
+    return true;
   }
 
   Future<void> _save() async {
     if (!persist) return;
     final file = await _dataFile();
     final payload = jsonEncode({
+      'courses': _courses.map((c) => c.toJson()).toList(),
       'students': _students.map((s) => s.toJson()).toList(),
       'sessions': _sessions.map((s) => s.toJson()).toList(),
       'ledger': _ledger.map((e) => e.toJson()).toList(),

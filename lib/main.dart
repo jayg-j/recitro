@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'data/recitro_store.dart';
@@ -8,6 +10,11 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Show the bundled font's license on Flutter's licenses page.
+  LicenseRegistry.addLicense(() async* {
+    final text = await rootBundle.loadString('assets/fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(['Plus Jakarta Sans'], text);
+  });
   final store = RecitroStore();
   final settings = SettingsStore();
   await Future.wait([store.init(), settings.init()]);

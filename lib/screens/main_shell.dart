@@ -3,11 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../data/recitro_store.dart';
 import '../flows/session_form_screen.dart';
-import '../flows/student_create_flow.dart';
+import 'courses_tab.dart';
 import 'sessions_tab.dart';
-import 'students_tab.dart';
 
-enum ShellSection { sessions, students }
+enum ShellSection { sessions, courses }
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -23,8 +22,8 @@ class _MainShellState extends State<MainShell> {
     switch (_section) {
       case ShellSection.sessions:
         await openSessionForm(context);
-      case ShellSection.students:
-        await showStudentCreateFlow(context);
+      case ShellSection.courses:
+        await createCourse(context);
     }
   }
 
@@ -35,25 +34,30 @@ class _MainShellState extends State<MainShell> {
 
     final body = IndexedStack(
       index: _section.index,
-      children: const [SessionsTab(), StudentsTab()],
+      children: const [SessionsTab(), CoursesTab()],
     );
 
     final store = context.watch<RecitroStore>();
-    // The empty state already shows its own button.
-    final tabEmpty = _section == ShellSection.sessions
-        ? store.sessions.isEmpty
-        : store.students.isEmpty;
+    final onSessions = _section == ShellSection.sessions;
+    // Empty states show their own button; the side-by-side sessions layout
+    // has "New session" in its list header instead.
+    final hideFab = onSessions
+        ? store.sessions.isEmpty || sessionsTwoPane(width)
+        : store.courses.isEmpty;
 
-    final fab = tabEmpty ? null : FloatingActionButton.extended(
-      key: Key(
-        _section == ShellSection.sessions ? 'newSessionFab' : 'addStudentFab',
-      ),
-      onPressed: _onAdd,
-      icon: const Icon(Icons.add_rounded),
-      label: Text(
-        _section == ShellSection.sessions ? 'New session' : 'Add student',
-      ),
-    );
+    final fab = hideFab
+        ? null
+        : FloatingActionButton.extended(
+            key: Key(onSessions ? 'newSessionFab' : 'newCourseFab'),
+            onPressed: _onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(onSessions ? 'New session' : 'New course'),
+          );
+
+    const sessionsIcon = Icon(Icons.auto_stories_outlined);
+    const sessionsIconOn = Icon(Icons.auto_stories_rounded);
+    const coursesIcon = Icon(Icons.school_outlined);
+    const coursesIconOn = Icon(Icons.school_rounded);
 
     if (wide) {
       return Scaffold(
@@ -61,21 +65,21 @@ class _MainShellState extends State<MainShell> {
         body: Row(
           children: [
             NavigationRail(
-              extended: width >= 1000,
+              extended: width >= 1200,
               selectedIndex: _section.index,
               onDestinationSelected: (i) =>
                   setState(() => _section = ShellSection.values[i]),
               groupAlignment: -0.9,
               destinations: const [
                 NavigationRailDestination(
-                  icon: Icon(Icons.auto_stories_outlined),
-                  selectedIcon: Icon(Icons.auto_stories_rounded),
+                  icon: sessionsIcon,
+                  selectedIcon: sessionsIconOn,
                   label: Text('Sessions'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.people_outline_rounded),
-                  selectedIcon: Icon(Icons.people_rounded),
-                  label: Text('Students'),
+                  icon: coursesIcon,
+                  selectedIcon: coursesIconOn,
+                  label: Text('Courses'),
                 ),
               ],
             ),
@@ -94,18 +98,17 @@ class _MainShellState extends State<MainShell> {
             setState(() => _section = ShellSection.values[i]),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.auto_stories_outlined),
-            selectedIcon: Icon(Icons.auto_stories_rounded),
+            icon: sessionsIcon,
+            selectedIcon: sessionsIconOn,
             label: 'Sessions',
           ),
           NavigationDestination(
-            icon: Icon(Icons.people_outline_rounded),
-            selectedIcon: Icon(Icons.people_rounded),
-            label: 'Students',
+            icon: coursesIcon,
+            selectedIcon: coursesIconOn,
+            label: 'Courses',
           ),
         ],
       ),
     );
   }
 }
-

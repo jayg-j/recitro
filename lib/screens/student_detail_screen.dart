@@ -54,10 +54,13 @@ class StudentDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(student.name, style: text.headlineSmall),
-                        if (history.isNotEmpty)
-                          Text(
-                            '$total pts earned · ${history.length} '
-                            '${history.length == 1 ? 'reward' : 'rewards'}',
+                        Text(
+                          [
+                            store.courseById(student.courseId)?.name ?? '',
+                            if (history.isNotEmpty)
+                              '$total pts · ${history.length} '
+                                  '${history.length == 1 ? 'reward' : 'rewards'}',
+                          ].where((s) => s.isNotEmpty).join(' · '),
                             style: text.bodyMedium?.copyWith(
                               color: context.palette.muted,
                             ),

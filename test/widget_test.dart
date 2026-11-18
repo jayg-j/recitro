@@ -119,7 +119,8 @@ void main() {
     await tapAndSettle(find.byTooltip('Close'));
 
     await tapAndSettle(find.byTooltip('Back'));
-    await tapAndSettle(find.text('Students'));
+    await tapAndSettle(find.text('Courses').last);
+    await tapAndSettle(find.text('My class'));
     expect(find.text('Ann Santos'), findsOneWidget);
 
     expect(tester.takeException(), isNull);
