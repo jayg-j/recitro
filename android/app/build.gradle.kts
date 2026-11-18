@@ -51,9 +51,24 @@ flutter {
 val recitroRoot = rootProject.projectDir.parentFile!!
 val ensureEmulatorScript = recitroRoot.resolve("scripts/ensure-pixel8-ready.ps1")
 
+// Flutter passes -Ptarget-platform (e.g. android-arm64 for a real phone, android-x64 for the
+// emulator). The Pixel 8 emulator check only applies to emulator builds; real phones skip it.
+val recitroTargetPlatform = (project.findProperty("target-platform") as String?).orEmpty()
+val recitroTargetsEmulator =
+    recitroTargetPlatform.isEmpty() ||
+        recitroTargetPlatform.contains("android-x64") ||
+        recitroTargetPlatform.contains("android-x86")
+val recitroTargetAbi =
+    when {
+        recitroTargetPlatform.contains("android-arm64") -> "arm64-v8a"
+        recitroTargetPlatform.contains("android-arm") -> "armeabi-v7a"
+        else -> "x86_64"
+    }
+
 fun runRecitroEnsureEmulator(phase: String) {
     if (!ensureEmulatorScript.isFile) return
     if (System.getenv("CI") != null) return
+    if (!recitroTargetsEmulator) return
     logger.lifecycle("Recitro: $phase — wait for emulator-5554 Package Manager…")
     val process =
         ProcessBuilder(
@@ -92,7 +107,7 @@ afterEvaluate {
         doFirst { runRecitroEnsureEmulator("before debug assemble") }
         doLast {
             val apkDir = recitroRoot.resolve("build/app/outputs/flutter-apk")
-            val split = apkDir.resolve("app-x86_64-debug.apk")
+            val split = apkDir.resolve("app-$recitroTargetAbi-debug.apk")
             val installApk = apkDir.resolve("app-debug.apk")
             if (split.isFile) {
                 split.copyTo(installApk, overwrite = true)
