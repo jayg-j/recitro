@@ -37,23 +37,32 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     });
   }
 
-  Future<void> _openCallFlow(String studentId) async {
+  Future<void> _openCallFlow(
+    String studentId, {
+    List<String> shuffleFrom = const [],
+  }) async {
     if (_dialogOpen) return;
     _dialogOpen = true;
     await showCallFlowDialog(
       context: context,
       sessionId: widget.sessionId,
       studentId: studentId,
+      shuffleFrom: shuffleFrom,
     );
     _dialogOpen = false;
   }
 
-  Future<void> _callNext() async {
+  /// Picks a student at random and shows the pick landing on them.
+  Future<void> _pickRandom() async {
     final store = context.read<RecitroStore>();
     final session = store.sessionById(widget.sessionId);
     if (session == null) return;
+    final candidates =
+        store.pickPool(session).keys.map((s) => s.name).toList();
     final id = await store.pickRandomStudent(session);
-    if (id != null && mounted) await _openCallFlow(id);
+    if (id != null && mounted) {
+      await _openCallFlow(id, shuffleFrom: candidates);
+    }
   }
 
   Future<void> _callSpecific(String studentId) async {
@@ -194,13 +203,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       bottomNavigationBar: students.isEmpty
           ? null
           : BottomAction(
-              child: FilledButton(
+              child: FilledButton.icon(
                 key: const Key('callNext'),
                 style: primaryActionStyle(),
-                onPressed: canCall ? _callNext : null,
-                child: Text(
+                onPressed: canCall ? _pickRandom : null,
+                icon: const Icon(Icons.shuffle_rounded, size: 20),
+                label: Text(
                   canCall || session.pendingStudentId != null
-                      ? 'Call next student'
+                      ? 'Pick a random student'
                       : 'Everyone\'s been called',
                 ),
               ),

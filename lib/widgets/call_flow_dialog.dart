@@ -11,38 +11,70 @@ import 'ui.dart';
 /// 1. Decide whether the student answers now (or skip them for later).
 /// 2. Score the answer (any number of points, or "didn't answer").
 /// 3. See reward progress and hand out the reward if unlocked.
+///
+/// When [shuffleFrom] lists more than one name, the dialog first cycles
+/// through them and lands on the picked student, so the random pick is
+/// visible to the class.
 Future<void> showCallFlowDialog({
   required BuildContext context,
   required String sessionId,
   required String studentId,
+  List<String> shuffleFrom = const [],
 }) {
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => _CallFlowDialog(sessionId: sessionId, studentId: studentId),
+    builder: (_) => _CallFlowDialog(
+      sessionId: sessionId,
+      studentId: studentId,
+      shuffleFrom: shuffleFrom,
+    ),
   );
 }
 
-enum _Step { called, score, reward }
+enum _Step { picking, called, score, reward }
 
 class _CallFlowDialog extends StatefulWidget {
-  const _CallFlowDialog({required this.sessionId, required this.studentId});
+  const _CallFlowDialog({
+    required this.sessionId,
+    required this.studentId,
+    required this.shuffleFrom,
+  });
 
   final String sessionId;
   final String studentId;
+  final List<String> shuffleFrom;
 
   @override
   State<_CallFlowDialog> createState() => _CallFlowDialogState();
 }
 
-class _CallFlowDialogState extends State<_CallFlowDialog> {
-  _Step _step = _Step.called;
+class _CallFlowDialogState extends State<_CallFlowDialog>
+    with SingleTickerProviderStateMixin {
+  late _Step _step =
+      widget.shuffleFrom.length > 1 ? _Step.picking : _Step.called;
   int? _points;
   late final TextEditingController _rewardLabel = TextEditingController();
   bool _busy = false;
 
+  late final AnimationController _shuffle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (_step == _Step.picking) {
+      _shuffle.forward().whenComplete(() {
+        if (mounted) setState(() => _step = _Step.called);
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _shuffle.dispose();
     _rewardLabel.dispose();
     super.dispose();
   }
@@ -69,6 +101,11 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
     _points ??= session.pointsPerAnswer;
 
     final Widget content = switch (_step) {
+      _Step.picking => _PickingStep(
+          animation: _shuffle,
+          names: widget.shuffleFrom,
+          picked: student.name,
+        ),
       _Step.called => _CalledStep(
           name: student.name,
           note: switch (state.outcomeBeforeCall) {
@@ -148,6 +185,63 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Cycles through candidate names, slowing down, and ends on [picked].
+class _PickingStep extends StatelessWidget {
+  const _PickingStep({
+    required this.animation,
+    required this.names,
+    required this.picked,
+  });
+
+  final Animation<double> animation;
+  final List<String> names;
+  final String picked;
+
+  static const _ticks = 16;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final pickedIndex = names.indexOf(picked).clamp(0, names.length - 1);
+    // Start so that the last tick lands exactly on the picked name.
+    final start = (pickedIndex - _ticks) % names.length;
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = Curves.easeOutCubic.transform(animation.value);
+        final tick = (t * _ticks).floor();
+        final name = animation.isCompleted
+            ? picked
+            : names[(start + tick) % names.length];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(child: StudentAvatar(name: name, size: 64)),
+            const SizedBox(height: Space.lg),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: text.headlineSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: Space.xs),
+            Text(
+              'Picking a student…',
+              textAlign: TextAlign.center,
+              style: text.bodyMedium?.copyWith(color: AppColors.muted),
+            ),
+            // Keeps the dialog the same height as the next step.
+            const SizedBox(height: Space.xl + 44 + Space.xs + 40),
+          ],
+        );
+      },
     );
   }
 }

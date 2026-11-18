@@ -229,22 +229,24 @@ class RecitroStore extends ChangeNotifier {
   int priorityWaitingCount(RecitationSession session) =>
       _students.where((s) => isPriority(session, s.id)).length;
 
-  /// Picks the next student at random. Students who missed the previous
-  /// session are always picked before anyone else.
-  Future<String?> pickRandomStudent(RecitationSession session) async {
-    if (session.pendingStudentId != null) return null;
+  /// Students the next random pick chooses from, with their weights.
+  /// Students who missed the previous session always come first.
+  Map<Student, int> pickPool(RecitationSession session) {
+    if (session.pendingStudentId != null) return const {};
     final weights = <Student, int>{};
     for (final student in _students) {
       final w = pickWeightForStudent(session, student);
       if (w > 0) weights[student] = w;
     }
-    if (weights.isEmpty) return null;
-
     final priority =
         weights.keys.where((s) => isPriority(session, s.id)).toList();
-    final pool = priority.isNotEmpty
-        ? {for (final s in priority) s: 1}
-        : weights;
+    return priority.isNotEmpty ? {for (final s in priority) s: 1} : weights;
+  }
+
+  /// Picks the next student at random from [pickPool].
+  Future<String?> pickRandomStudent(RecitationSession session) async {
+    final pool = pickPool(session);
+    if (pool.isEmpty) return null;
 
     final total = pool.values.fold<int>(0, (a, b) => a + b);
     var roll = Random().nextInt(total);
