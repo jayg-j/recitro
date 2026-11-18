@@ -13,11 +13,15 @@ import 'reward_center_dialog.dart';
 ///    skips them for later.
 /// 2. Teacher scores the answer (any number of points, or "didn't answer").
 /// 3. Reward progress, and the reward can be handed out if unlocked.
+///
+/// Skipping or marking "didn't answer" shows a message with Undo, which
+/// reopens the call (back to the reveal, or straight back to scoring).
 Future<void> runCall({
   required BuildContext context,
   required String sessionId,
   required String studentId,
   List<String> shuffleFrom = const [],
+  bool skipReveal = false,
 }) async {
   final store = context.read<RecitroStore>();
   final session = store.sessionById(sessionId);
@@ -25,31 +29,104 @@ Future<void> runCall({
   final state = session?.studentStates[studentId];
   if (session == null || student == null || state == null) return;
 
-  final note = switch (state.outcomeBeforeCall) {
-    CallOutcome.answered => 'Already answered this session',
-    CallOutcome.notAnswered => 'Didn\'t answer earlier',
-    _ => state.priority ? 'Missed last session' : null,
-  };
+  final firstName = student.name.trim().split(RegExp(r'\s+')).first;
+  // Where the student returns to if this call ends without an answer.
+  final before = state.outcomeBeforeCall ?? CallOutcome.notCalled;
 
-  final choice = await showPickReveal(
-    context,
-    picked: student.name,
-    shuffleFrom: shuffleFrom,
-    note: note,
-  );
-  if (!context.mounted) return;
+  if (!skipReveal) {
+    final note = switch (state.outcomeBeforeCall) {
+      CallOutcome.answered => 'Already answered this session',
+      CallOutcome.notAnswered => 'Didn\'t answer earlier',
+      _ => state.priority ? 'Missed last session' : null,
+    };
 
-  if (choice == RevealChoice.skip) {
-    await store.skipCall(session);
-    return;
+    final choice = await showPickReveal(
+      context,
+      picked: student.name,
+      shuffleFrom: shuffleFrom,
+      note: note,
+    );
+    if (!context.mounted) return;
+
+    if (choice == RevealChoice.skip) {
+      await store.skipCall(session);
+      if (!context.mounted) return;
+      _showUndo(
+        context,
+        message: 'Skipped $firstName. Back in the queue.',
+        onUndo: () async {
+          final s = store.sessionById(sessionId);
+          if (s == null) return;
+          final current =
+              s.studentStates[studentId]?.outcome ?? CallOutcome.notCalled;
+          if (await store.reopenCall(s, studentId, before: current) &&
+              context.mounted) {
+            await runCall(
+              context: context,
+              sessionId: sessionId,
+              studentId: studentId,
+            );
+          }
+        },
+      );
+      return;
+    }
   }
 
-  await showDialog<void>(
+  final result = await showDialog<_ScoreResult>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _ScoreDialog(sessionId: sessionId, studentId: studentId),
   );
+  if (result != _ScoreResult.notAnswered || !context.mounted) return;
+
+  _showUndo(
+    context,
+    message: '$firstName didn\'t answer.',
+    onUndo: () async {
+      final s = store.sessionById(sessionId);
+      if (s == null) return;
+      if (await store.reopenCall(s, studentId, before: before) &&
+          context.mounted) {
+        await runCall(
+          context: context,
+          sessionId: sessionId,
+          studentId: studentId,
+          skipReveal: true,
+        );
+      }
+    },
+  );
 }
+
+void _showUndo(
+  BuildContext context, {
+  required String message,
+  required Future<void> Function() onUndo,
+}) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 6),
+        // Snackbars with an action stay up by default; this one should
+        // time out so it doesn't linger over the screen.
+        persist: false,
+        action: SnackBarAction(
+          key: const Key('undo'),
+          label: 'Undo',
+          // The snackbar is inverted: dark in light mode, light in dark mode.
+          textColor: Theme.of(context).brightness == Brightness.dark
+              ? Brand.navy
+              : Brand.amber,
+          onPressed: onUndo,
+        ),
+      ),
+    );
+}
+
+enum _ScoreResult { answered, notAnswered }
 
 enum _Step { score, reward }
 
@@ -109,7 +186,9 @@ class _ScoreDialogState extends State<_ScoreDialog> {
           }),
           onNoAnswer: () => _run(() async {
             await store.markNotAnswered(session);
-            if (context.mounted) Navigator.of(context).pop();
+            if (context.mounted) {
+              Navigator.of(context).pop(_ScoreResult.notAnswered);
+            }
           }),
         ),
       _Step.reward => RewardPanel(
@@ -128,13 +207,13 @@ class _ScoreDialogState extends State<_ScoreDialog> {
               rewardLabel: _rewardLabel.text,
             );
             if (context.mounted) {
-              Navigator.of(context).pop();
+              Navigator.of(context).pop(_ScoreResult.answered);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Reward given to ${student.name}')),
               );
             }
           }),
-          onClose: () => Navigator.of(context).pop(),
+          onClose: () => Navigator.of(context).pop(_ScoreResult.answered),
         ),
     };
 

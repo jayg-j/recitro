@@ -209,6 +209,34 @@ void main() {
     expect(s.studentStates[ann]!.pointsEarned, 0);
   });
 
+  test('undo reopens a skipped or unanswered call', () async {
+    final store = RecitroStore();
+    await store.addStudent('Ann');
+    await store.addStudent('Ben');
+    await addBasicSession(store, 'Quiz');
+    final s = store.sessions.first;
+    final ann = store.students.first.id;
+
+    // Didn't answer -> undo puts Ann back into the call.
+    await store.callStudent(s, ann);
+    await store.markNotAnswered(s);
+    expect(await store.reopenCall(s, ann, before: CallOutcome.notCalled),
+        isTrue);
+    expect(s.pendingStudentId, ann);
+    expect(s.studentStates[ann]!.outcome, CallOutcome.pending);
+
+    // Skipping the reopened call returns Ann to waiting, not "didn't answer".
+    await store.skipCall(s);
+    expect(s.studentStates[ann]!.outcome, CallOutcome.notCalled);
+
+    // Undo is refused while someone else is being called.
+    final ben = store.students[1].id;
+    await store.callStudent(s, ben);
+    expect(await store.reopenCall(s, ann, before: CallOutcome.notCalled),
+        isFalse);
+    expect(s.pendingStudentId, ben);
+  });
+
   test('answered recall uses lower pick weight', () async {
     final store = RecitroStore();
     await store.addStudent('A');

@@ -13,7 +13,10 @@ import '../models/student.dart';
 import '../models/student_session_state.dart';
 
 class RecitroStore extends ChangeNotifier {
-  RecitroStore();
+  RecitroStore({this.persist = true});
+
+  /// Tests can turn off disk reads and writes.
+  final bool persist;
 
   static const _uuid = Uuid();
   static const int primaryPickWeight = 10;
@@ -31,6 +34,7 @@ class RecitroStore extends ChangeNotifier {
   List<PointLedgerEntry> get ledger => List.unmodifiable(_ledger);
 
   Future<void> init() async {
+    if (!persist) return;
     await _load();
   }
 
@@ -279,6 +283,25 @@ class RecitroStore extends ChangeNotifier {
     return true;
   }
 
+  /// Undo for skip / didn't answer: puts [studentId] back into "being
+  /// called", remembering [before] as the outcome to return to if skipped
+  /// again. Returns false if another call is already in progress.
+  Future<bool> reopenCall(
+    RecitationSession session,
+    String studentId, {
+    required CallOutcome before,
+  }) async {
+    if (session.pendingStudentId != null) return false;
+    final state = session.studentStates[studentId];
+    if (state == null) return false;
+    state.outcome = CallOutcome.pending;
+    state.outcomeBeforeCall = before;
+    session.pendingStudentId = studentId;
+    await _save();
+    notifyListeners();
+    return true;
+  }
+
   /// The teacher decides this student does not answer now. They go back to
   /// where they were, so a waiting student stays in the queue (and keeps
   /// priority for the next session if never called).
@@ -414,6 +437,7 @@ class RecitroStore extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    if (!persist) return;
     final file = await _dataFile();
     final payload = jsonEncode({
       'students': _students.map((s) => s.toJson()).toList(),
