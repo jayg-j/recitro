@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Recitro mark: a speech bubble with two lines of text (recitation).
+     108dp adaptive-icon canvas; artwork stays inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="55"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+    <path
+        android:fillColor="#E8A838"
+        android:fillType="evenOdd"
+        android:pathData="M40,33 H68 A9,9 0 0 1 77,42 V58 A9,9 0 0 1 68,67 H52 L37,77 L42,67 H40 A9,9 0 0 1 31,58 V42 A9,9 0 0 1 40,33 Z
+                          M42,43 H66 A2,2 0 0 1 66,47 H42 A2,2 0 0 1 42,43 Z
+                          M42,53 H58 A2,2 0 0 1 58,57 H42 A2,2 0 0 1 42,53 Z" />
+    </group>
+</vector>

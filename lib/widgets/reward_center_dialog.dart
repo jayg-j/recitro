@@ -151,7 +151,7 @@ class RewardPanel extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               '/ $required pts',
-              style: text.titleMedium?.copyWith(color: AppColors.muted),
+              style: text.titleMedium?.copyWith(color: context.palette.muted),
             ),
           ],
         ),
@@ -159,7 +159,7 @@ class RewardPanel extends StatelessWidget {
         ProgressBar(value: earned, max: required),
         const SizedBox(height: Space.sm),
         Text(message, style: text.bodyMedium?.copyWith(
-          color: AppColors.muted,
+          color: context.palette.muted,
         )),
         if (canClaim) ...[
           const SizedBox(height: Space.xl),

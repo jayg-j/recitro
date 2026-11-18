@@ -43,7 +43,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }) async {
     if (_dialogOpen) return;
     _dialogOpen = true;
-    await showCallFlowDialog(
+    await runCall(
       context: context,
       sessionId: widget.sessionId,
       studentId: studentId,
@@ -347,7 +347,7 @@ class _StudentRow extends StatelessWidget {
       CallOutcome.notCalled => null,
     };
     final statusColor =
-        outcome == CallOutcome.notAnswered ? AppColors.red : AppColors.muted;
+        outcome == CallOutcome.notAnswered ? context.palette.danger : context.palette.muted;
 
     return InkWell(
       onTap: onTap,
@@ -395,7 +395,7 @@ class _StudentRow extends StatelessWidget {
                     studentId: student.id,
                   ),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.amberInk,
+                    foregroundColor: context.palette.accentInk,
                     visualDensity: VisualDensity.compact,
                   ),
                   child: const Text('Give reward'),

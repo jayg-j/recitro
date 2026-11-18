@@ -56,15 +56,15 @@ class StudentAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: highlighted
-            ? AppColors.navy
-            : AppColors.navy.withValues(alpha: 0.07),
+            ? context.palette.primary
+            : context.palette.primary.withValues(alpha: 0.07),
       ),
       child: Text(
         initials(name),
         style: TextStyle(
           fontSize: size * 0.36,
           fontWeight: FontWeight.w600,
-          color: highlighted ? Colors.white : AppColors.navy,
+          color: highlighted ? context.palette.onPrimary : context.palette.primary,
         ),
       ),
     );
@@ -140,7 +140,7 @@ class PageTitle extends StatelessWidget {
           if (subtitle != null) ...[
             const SizedBox(height: 2),
             Text(subtitle!, style: text.bodyMedium?.copyWith(
-              color: AppColors.muted,
+              color: context.palette.muted,
             )),
           ],
         ],
@@ -220,8 +220,8 @@ class ProgressBar extends StatelessWidget {
       child: LinearProgressIndicator(
         value: fraction,
         minHeight: height,
-        backgroundColor: AppColors.line,
-        color: fraction >= 1 ? AppColors.teal : AppColors.amber,
+        backgroundColor: context.palette.line,
+        color: fraction >= 1 ? context.palette.success : context.palette.accent,
       ),
     );
   }
@@ -254,7 +254,7 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: Space.sm),
               Text(
                 message,
-                style: text.bodyMedium?.copyWith(color: AppColors.muted),
+                style: text.bodyMedium?.copyWith(color: context.palette.muted),
                 textAlign: TextAlign.center,
               ),
               if (action != null) ...[
@@ -280,7 +280,7 @@ class BottomAction extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(top: BorderSide(color: AppColors.line)),
+        border: Border(top: BorderSide(color: context.palette.line)),
       ),
       child: SafeArea(
         top: false,
@@ -329,7 +329,7 @@ Future<bool> confirmDialog(
         ),
         FilledButton(
           style: destructive
-              ? FilledButton.styleFrom(backgroundColor: AppColors.red)
+              ? FilledButton.styleFrom(backgroundColor: context.palette.danger)
               : null,
           onPressed: () => Navigator.pop(ctx, true),
           child: Text(confirmLabel),

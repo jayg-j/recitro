@@ -121,7 +121,7 @@ class _StudentRow extends StatelessWidget {
                         subtitle,
                         style: text.bodySmall?.copyWith(
                           color:
-                              ready > 0 ? AppColors.amberInk : AppColors.muted,
+                              ready > 0 ? context.palette.accentInk : context.palette.muted,
                           fontWeight:
                               ready > 0 ? FontWeight.w600 : FontWeight.w400,
                         ),
@@ -131,8 +131,8 @@ class _StudentRow extends StatelessWidget {
               ),
               PopupMenuButton<_Action>(
                 tooltip: 'More',
-                icon: const Icon(Icons.more_vert_rounded,
-                    color: AppColors.muted, size: 20),
+                icon: Icon(Icons.more_vert_rounded,
+                    color: context.palette.muted, size: 20),
                 onSelected: (a) => _onAction(context, a),
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: _Action.rename, child: Text('Rename')),

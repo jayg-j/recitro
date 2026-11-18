@@ -59,7 +59,7 @@ class StudentDetailScreen extends StatelessWidget {
                             '$total pts earned · ${history.length} '
                             '${history.length == 1 ? 'reward' : 'rewards'}',
                             style: text.bodyMedium?.copyWith(
-                              color: AppColors.muted,
+                              color: context.palette.muted,
                             ),
                           ),
                       ],
@@ -83,7 +83,7 @@ class StudentDetailScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: Space.page),
                 child: Text('None yet.', style: text.bodyMedium?.copyWith(
-                  color: AppColors.muted,
+                  color: context.palette.muted,
                 )),
               )
             else
@@ -116,7 +116,7 @@ class StudentDetailScreen extends StatelessWidget {
                           Text(
                             '+${e.points}',
                             style: text.titleSmall?.copyWith(
-                              color: AppColors.teal,
+                              color: context.palette.success,
                             ),
                           ),
                         ],
@@ -186,7 +186,7 @@ class _ProgressRow extends StatelessWidget {
                     studentId: studentId,
                   ),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.amberInk,
+                    foregroundColor: context.palette.accentInk,
                   ),
                   child: const Text('Give reward'),
                 )

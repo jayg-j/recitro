@@ -125,7 +125,7 @@ class _SessionCard extends StatelessWidget {
                     Text(
                       '$priority missed last time',
                       style: text.bodySmall?.copyWith(
-                        color: AppColors.navy,
+                        color: context.palette.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

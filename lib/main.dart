@@ -24,7 +24,9 @@ class RecitroApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Recitro',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.build(),
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.system,
         home: const MainShell(),
       ),
     );
