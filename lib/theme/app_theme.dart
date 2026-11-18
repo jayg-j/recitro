@@ -109,8 +109,13 @@ abstract final class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.navy,
         foregroundColor: Colors.white,
-        extendedTextStyle: text.labelLarge,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        extendedTextStyle: text.labelLarge?.copyWith(fontSize: 14),
+        extendedSizeConstraints:
+            const BoxConstraints.tightFor(height: 48),
+        extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
+        extendedIconLabelSpacing: 8,
+        iconSize: 20,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
