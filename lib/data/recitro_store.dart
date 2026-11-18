@@ -81,6 +81,25 @@ class RecitroStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds several students at once (one save), e.g. from a pasted list.
+  Future<void> addStudents(Iterable<String> names) async {
+    var added = false;
+    for (final raw in names) {
+      final name = raw.trim();
+      if (name.isEmpty) continue;
+      final student = Student(id: _uuid.v4(), name: name);
+      _students.add(student);
+      for (final session in _sessions) {
+        session.studentStates[student.id] =
+            StudentSessionState(studentId: student.id);
+      }
+      added = true;
+    }
+    if (!added) return;
+    await _save();
+    notifyListeners();
+  }
+
   Future<void> updateStudent(String id, String name) async {
     final student = studentById(id);
     if (student == null) return;

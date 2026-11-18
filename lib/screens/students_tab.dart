@@ -29,9 +29,20 @@ class StudentsTab extends StatelessWidget {
             child: EmptyState(
               title: 'No students yet',
               message: 'Add the students in your class to start calling them.',
-              action: FilledButton(
-                onPressed: () => showStudentCreateFlow(context),
-                child: const Text('Add students'),
+              action: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton(
+                    onPressed: () => showStudentCreateFlow(context),
+                    child: const Text('Add students'),
+                  ),
+                  const SizedBox(height: Space.xs),
+                  TextButton(
+                    onPressed: () =>
+                        showStudentCreateFlow(context, paste: true),
+                    child: const Text('Paste a list'),
+                  ),
+                ],
               ),
             ),
           ),
