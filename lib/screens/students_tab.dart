@@ -5,6 +5,7 @@ import '../data/recitro_store.dart';
 import '../flows/student_create_flow.dart';
 import '../models/student.dart';
 import '../theme/app_theme.dart';
+import '../widgets/settings_sheet.dart';
 import '../widgets/ui.dart';
 import 'student_detail_screen.dart';
 
@@ -21,7 +22,9 @@ class StudentsTab extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ContentWidth(child: PageTitle(title: 'Students')),
+          const ContentWidth(
+            child: PageTitle(title: 'Students', trailing: SettingsButton()),
+          ),
           Expanded(
             child: EmptyState(
               title: 'No students yet',
@@ -41,6 +44,7 @@ class StudentsTab extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 96),
         children: [
           PageTitle(
+            trailing: const SettingsButton(),
             title: 'Students',
             subtitle: '${students.length} in class',
           ),
@@ -88,8 +92,8 @@ class _StudentRow extends StatelessWidget {
     final String? subtitle = ready > 0
         ? (ready == 1 ? 'Reward ready' : '$ready rewards ready')
         : total > 0
-            ? '$total pts earned'
-            : null;
+        ? '$total pts earned'
+        : null;
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
@@ -120,10 +124,12 @@ class _StudentRow extends StatelessWidget {
                       Text(
                         subtitle,
                         style: text.bodySmall?.copyWith(
-                          color:
-                              ready > 0 ? context.palette.accentInk : context.palette.muted,
-                          fontWeight:
-                              ready > 0 ? FontWeight.w600 : FontWeight.w400,
+                          color: ready > 0
+                              ? context.palette.accentInk
+                              : context.palette.muted,
+                          fontWeight: ready > 0
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                       ),
                   ],
@@ -131,8 +137,11 @@ class _StudentRow extends StatelessWidget {
               ),
               PopupMenuButton<_Action>(
                 tooltip: 'More',
-                icon: Icon(Icons.more_vert_rounded,
-                    color: context.palette.muted, size: 20),
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: context.palette.muted,
+                  size: 20,
+                ),
                 onSelected: (a) => _onAction(context, a),
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: _Action.rename, child: Text('Rename')),

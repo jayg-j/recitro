@@ -6,6 +6,7 @@ import '../flows/session_form_screen.dart';
 import '../flows/student_create_flow.dart';
 import '../models/recitation_session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/settings_sheet.dart';
 import '../widgets/ui.dart';
 import 'session_detail_screen.dart';
 
@@ -21,13 +22,14 @@ class SessionsTab extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ContentWidth(child: PageTitle(title: 'Sessions')),
+          const ContentWidth(
+            child: PageTitle(title: 'Sessions', trailing: SettingsButton()),
+          ),
           Expanded(
             child: store.students.isEmpty
                 ? EmptyState(
                     title: 'Add your class first',
-                    message:
-                        'Once your students are in, you can start a session and call them one at a time.',
+                    message: 'Once your students are in, you can start a session and call them one at a time.',
                     action: FilledButton(
                       onPressed: () => showStudentCreateFlow(context),
                       child: const Text('Add students'),
@@ -50,7 +52,7 @@ class SessionsTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 96),
         children: [
-          const PageTitle(title: 'Sessions'),
+          const PageTitle(title: 'Sessions', trailing: SettingsButton()),
           const SizedBox(height: Space.md),
           for (final session in sessions)
             Padding(

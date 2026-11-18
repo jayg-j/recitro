@@ -118,25 +118,39 @@ class SectionHeader extends StatelessWidget {
 
 /// Large page title used at the top of each tab.
 class PageTitle extends StatelessWidget {
-  const PageTitle({super.key, required this.title, this.subtitle});
+  const PageTitle({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+  });
 
   final String title;
   final String? subtitle;
+
+  /// Optional action aligned with the title (e.g. a settings button).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         Space.page,
         Space.xl,
-        Space.page,
+        // Icon buttons carry their own padding; pull them to the gutter.
+        trailing == null ? Space.page : Space.page - 8,
         Space.xs,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: text.headlineMedium),
+          Row(
+            children: [
+              Expanded(child: Text(title, style: text.headlineMedium)),
+              ?trailing,
+            ],
+          ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
             Text(subtitle!, style: text.bodyMedium?.copyWith(

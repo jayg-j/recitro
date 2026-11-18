@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:recitro/data/recitro_store.dart';
+import 'package:recitro/data/settings_store.dart';
 import 'package:recitro/main.dart';
+import 'package:recitro/screens/main_shell.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -21,6 +23,29 @@ void expectNoLayoutErrors(WidgetTester tester, String where) {
 }
 
 void main() {
+  testWidgets('appearance setting switches between light and dark',
+      (tester) async {
+    final store = RecitroStore();
+    final settings = SettingsStore(persist: false);
+    await tester.pumpWidget(RecitroApp(store: store, settings: settings));
+    await tester.pumpAndSettle();
+
+    Brightness brightness() =>
+        Theme.of(tester.element(find.byType(MainShell))).brightness;
+    expect(settings.themeMode, ThemeMode.system);
+
+    await tester.tap(find.byKey(const Key('openSettings')).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+    expect(settings.themeMode, ThemeMode.dark);
+    expect(brightness(), Brightness.dark);
+
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(brightness(), Brightness.light);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   PathProviderPlatform.instance = _FakePathProvider();
 
