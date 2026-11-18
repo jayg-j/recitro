@@ -6,6 +6,7 @@ import '../flows/session_form_screen.dart';
 import '../flows/student_create_flow.dart';
 import '../models/recitation_session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/dates.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/ui.dart';
 import 'session_detail_screen.dart';
@@ -82,6 +83,7 @@ class _SessionCard extends StatelessWidget {
     final total = store.students.length;
     final called = store.calledCount(session);
     final priority = store.priorityWaitingCount(session);
+    final date = sessionDateLabel(context, session.createdAt);
 
     return Card(
       child: InkWell(
@@ -95,11 +97,23 @@ class _SessionCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                session.name,
-                style: text.titleMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Expanded(
+                    child: Text(
+                      session.name,
+                      style: text.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (date != null) ...[
+                    const SizedBox(width: Space.md),
+                    Text(date, style: text.bodySmall),
+                  ],
+                ],
               ),
               const SizedBox(height: 2),
               Text(
