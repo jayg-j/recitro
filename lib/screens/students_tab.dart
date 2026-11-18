@@ -16,59 +16,40 @@ class StudentsTab extends StatelessWidget {
     final store = context.watch<RecitroStore>();
     final students = [...store.students]
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    final readyTotal =
-        students.fold<int>(0, (n, s) => n + store.claimableRewardCount(s.id));
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: PageTitle(
-            title: 'Students',
-            subtitle: students.isEmpty
-                ? 'Your class list.'
-                : [
-                    '${students.length} ${students.length == 1 ? 'student' : 'students'}',
-                    if (readyTotal > 0)
-                      '$readyTotal ${readyTotal == 1 ? 'reward' : 'rewards'} ready',
-                  ].join(' · '),
-          ),
-        ),
-        if (students.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
+    if (students.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const ContentWidth(child: PageTitle(title: 'Students')),
+          Expanded(
             child: EmptyState(
-              icon: Icons.people_outline_rounded,
               title: 'No students yet',
               message: 'Add the students in your class to start calling them.',
-              action: FilledButton.icon(
+              action: FilledButton(
                 onPressed: () => showStudentCreateFlow(context),
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Add student'),
-              ),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              Space.page,
-              Space.lg,
-              Space.page,
-              96,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: Card(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < students.length; i++) ...[
-                      if (i > 0) const Divider(indent: 68),
-                      _StudentRow(student: students[i]),
-                    ],
-                  ],
-                ),
+                child: const Text('Add students'),
               ),
             ),
           ),
-      ],
+        ],
+      );
+    }
+
+    return ContentWidth(
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 96),
+        children: [
+          PageTitle(
+            title: 'Students',
+            subtitle: '${students.length} in class',
+          ),
+          const SizedBox(height: Space.md),
+          GroupCard(
+            children: [for (final s in students) _StudentRow(student: s)],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -88,9 +69,9 @@ class _StudentRow extends StatelessWidget {
       case _Action.delete:
         final ok = await confirmDialog(
           context,
-          title: 'Delete ${student.name}?',
-          message: 'Their points and reward history will be removed.',
-          confirmLabel: 'Delete',
+          title: 'Remove ${student.name}?',
+          message: 'Their points and reward history will be deleted.',
+          confirmLabel: 'Remove',
           destructive: true,
         );
         if (ok) await store.deleteStudent(student.id);
@@ -103,7 +84,12 @@ class _StudentRow extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final total = store.totalPointsForStudent(student.id);
     final ready = store.claimableRewardCount(student.id);
-    final rewards = store.ledgerForStudent(student.id).length;
+
+    final String? subtitle = ready > 0
+        ? (ready == 1 ? 'Reward ready' : '$ready rewards ready')
+        : total > 0
+            ? '$total pts earned'
+            : null;
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
@@ -111,46 +97,50 @@ class _StudentRow extends StatelessWidget {
           builder: (_) => StudentDetailScreen(studentId: student.id),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.xs, Space.md),
-        child: Row(
-          children: [
-            StudentAvatar(name: student.name),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student.name,
-                    style: text.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$total pts · $rewards ${rewards == 1 ? 'reward' : 'rewards'}',
-                    style: text.bodySmall,
-                  ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(Space.lg, 8, Space.xs, 8),
+          child: Row(
+            children: [
+              StudentAvatar(name: student.name, size: 36),
+              const SizedBox(width: Space.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      student.name,
+                      style: text.bodyLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        style: text.bodySmall?.copyWith(
+                          color:
+                              ready > 0 ? AppColors.amberInk : AppColors.muted,
+                          fontWeight:
+                              ready > 0 ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<_Action>(
+                tooltip: 'More',
+                icon: const Icon(Icons.more_vert_rounded,
+                    color: AppColors.muted, size: 20),
+                onSelected: (a) => _onAction(context, a),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: _Action.rename, child: Text('Rename')),
+                  PopupMenuItem(value: _Action.delete, child: Text('Remove')),
                 ],
               ),
-            ),
-            if (ready > 0)
-              Pill(
-                label: '$ready ready',
-                color: AppColors.amberInk,
-                icon: Icons.redeem_rounded,
-              ),
-            PopupMenuButton<_Action>(
-              tooltip: 'More',
-              icon: const Icon(Icons.more_vert_rounded, color: AppColors.muted),
-              onSelected: (a) => _onAction(context, a),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: _Action.rename, child: Text('Rename')),
-                PopupMenuItem(value: _Action.delete, child: Text('Delete')),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

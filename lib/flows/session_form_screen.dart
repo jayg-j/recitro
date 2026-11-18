@@ -118,6 +118,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     final text = Theme.of(context).textTheme;
     final missed = _editing ? 0 : store.studentsMissedInLatestSession().length;
 
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -127,26 +128,115 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         ),
         title: Text(_editing ? 'Edit session' : 'New session'),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            Space.page,
-            Space.sm,
-            Space.page,
-            Space.md,
-          ),
-          child: FilledButton(
-            onPressed: _save,
-            child: Text(_editing ? 'Save changes' : 'Create session'),
-          ),
+      bottomNavigationBar: BottomAction(
+        child: FilledButton(
+          style: primaryActionStyle(),
+          onPressed: _save,
+          child: Text(_editing ? 'Save changes' : 'Create session'),
         ),
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: Space.xl),
-          children: [
-            if (missed > 0)
+        child: ContentWidth(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: Space.xl),
+            children: [
+              const SectionHeader('Details'),
+              _Group(
+                children: [
+                  TextFormField(
+                    controller: _name,
+                    autofocus: !_editing,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Session name',
+                      hintText: 'Science — Week 3',
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Give the session a name'
+                        : null,
+                  ),
+                  const SizedBox(height: Space.md),
+                  TextFormField(
+                    controller: _reward,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Reward',
+                      hintText: 'Sticker, homework pass, extra recess…',
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Decide what students earn'
+                        : null,
+                  ),
+                ],
+              ),
+              const SectionHeader('Points'),
+              _Group(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _points,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Per answer',
+                          ),
+                          validator: _positive,
+                        ),
+                      ),
+                      const SizedBox(width: Space.md),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _threshold,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'To earn reward',
+                          ),
+                          validator: _positive,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Space.sm),
+                  Text(
+                    'You can give more or fewer points each time you score.',
+                    style: text.bodySmall,
+                  ),
+                ],
+              ),
+              const SectionHeader('Calling'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.page),
+                child: Card(
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        value: _recallUnanswered,
+                        onChanged: (v) =>
+                            setState(() => _recallUnanswered = v),
+                        title: const Text('Call again if not answered'),
+                      ),
+                      const Divider(indent: Space.lg),
+                      SwitchListTile(
+                        value: _recallAnswered,
+                        onChanged: (v) => setState(() => _recallAnswered = v),
+                        title: const Text('Call again after answering'),
+                        subtitle: const Text('Picked less often'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   Space.page,
@@ -154,122 +244,16 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                   Space.page,
                   0,
                 ),
-                child: NoticeCard(
-                  icon: Icons.flag_rounded,
-                  title: '$missed ${missed == 1 ? 'student gets' : 'students get'} priority',
-                  message:
-                      'They were not called last session, so they will be called first in this one.',
+                child: Text(
+                  missed > 0
+                      ? '$missed ${missed == 1 ? 'student' : 'students'} '
+                          'missed last session and will be called first.'
+                      : 'Anyone not called this session goes first next time.',
+                  style: text.bodySmall,
                 ),
               ),
-            const SectionHeader('Session'),
-            _Group(
-              children: [
-                TextFormField(
-                  controller: _name,
-                  autofocus: !_editing,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Session name',
-                    hintText: 'e.g. Science — Week 3',
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Give the session a name'
-                      : null,
-                ),
-              ],
-            ),
-            const SectionHeader('Reward'),
-            _Group(
-              children: [
-                TextFormField(
-                  controller: _reward,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'What students earn',
-                    hintText: 'e.g. Sticker, +5 quiz points, early dismissal',
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Decide what the reward is'
-                      : null,
-                ),
-                const SizedBox(height: Space.md),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _points,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Points per answer',
-                          helperText: 'Default score. You can change it each time.',
-                        ),
-                        validator: _positive,
-                      ),
-                    ),
-                    const SizedBox(width: Space.md),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _threshold,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Points to earn it',
-                          helperText: 'Reward unlocks at this score.',
-                        ),
-                        validator: _positive,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SectionHeader('Calling'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.page),
-              child: Card(
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      value: _recallUnanswered,
-                      onChanged: (v) => setState(() => _recallUnanswered = v),
-                      title: const Text('Call again if not answered'),
-                      subtitle: const Text(
-                        'Students who didn\'t answer go back into the queue.',
-                      ),
-                    ),
-                    const Divider(indent: Space.lg, endIndent: Space.lg),
-                    SwitchListTile(
-                      value: _recallAnswered,
-                      onChanged: (v) => setState(() => _recallAnswered = v),
-                      title: const Text('Call again after answering'),
-                      subtitle: const Text(
-                        'Students who answered can be picked again, less often.',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.page,
-                Space.md,
-                Space.page,
-                0,
-              ),
-              child: Text(
-                'Students are called one at a time. Anyone not called by the end '
-                'of a session gets priority in the next one.',
-                style: text.bodySmall,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

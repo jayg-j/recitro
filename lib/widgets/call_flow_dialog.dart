@@ -71,10 +71,11 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
     final Widget content = switch (_step) {
       _Step.called => _CalledStep(
           name: student.name,
-          priority: state.priority &&
-              (state.outcomeBeforeCall ?? CallOutcome.notCalled) ==
-                  CallOutcome.notCalled,
-          previousOutcome: state.outcomeBeforeCall,
+          note: switch (state.outcomeBeforeCall) {
+            CallOutcome.answered => 'Already answered this session',
+            CallOutcome.notAnswered => 'Didn\'t answer earlier',
+            _ => state.priority ? 'Missed last session' : null,
+          },
           onAnswer: () => setState(() => _step = _Step.score),
           onSkip: () => _run(() async {
             await store.skipCall(session);
@@ -98,7 +99,6 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
         ),
       _Step.reward => RewardPanel(
           studentName: student.name,
-          sessionName: session.name,
           rewardLabel: session.rewardLabel,
           earned: state.pointsEarned,
           required: session.pointsRequiredForReward,
@@ -124,14 +124,27 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
     };
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(Space.xl),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.xl,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 380),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Space.xl),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: KeyedSubtree(key: ValueKey(_step), child: content),
+          padding: const EdgeInsets.fromLTRB(
+            Space.xl,
+            Space.xl,
+            Space.xl,
+            Space.lg,
+          ),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: KeyedSubtree(key: ValueKey(_step), child: content),
+            ),
           ),
         ),
       ),
@@ -142,75 +155,40 @@ class _CallFlowDialogState extends State<_CallFlowDialog> {
 class _CalledStep extends StatelessWidget {
   const _CalledStep({
     required this.name,
-    required this.priority,
-    required this.previousOutcome,
+    required this.note,
     required this.onAnswer,
     required this.onSkip,
   });
 
   final String name;
-  final bool priority;
-  final CallOutcome? previousOutcome;
+  final String? note;
   final VoidCallback onAnswer;
   final VoidCallback onSkip;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final note = switch (previousOutcome) {
-      CallOutcome.answered => 'Called again — already answered this session.',
-      CallOutcome.notAnswered => 'Called again — didn\'t answer earlier.',
-      _ => priority
-          ? 'Wasn\'t called last session, so they go first.'
-          : null,
-    };
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'NOW CALLING',
-          textAlign: TextAlign.center,
-          style: text.labelSmall,
-        ),
-        const SizedBox(height: Space.lg),
-        Center(
-          child: StudentAvatar(
-            name: name,
-            size: 88,
-            background: AppColors.amber,
-            foreground: AppColors.navy,
-          ),
-        ),
+        Center(child: StudentAvatar(name: name, size: 64, highlighted: true)),
         const SizedBox(height: Space.lg),
         Text(name, textAlign: TextAlign.center, style: text.headlineSmall),
-        if (priority) ...[
-          const SizedBox(height: Space.sm),
-          const Center(child: PriorityPill()),
-        ],
-        if (note != null) ...[
-          const SizedBox(height: Space.sm),
-          Text(note, textAlign: TextAlign.center, style: text.bodySmall),
-        ],
-        const SizedBox(height: Space.xl),
-        FilledButton.icon(
-          onPressed: onAnswer,
-          icon: const Icon(Icons.record_voice_over_rounded),
-          label: const Text('Let them answer'),
-        ),
-        const SizedBox(height: Space.sm),
-        OutlinedButton(
-          onPressed: onSkip,
-          child: const Text('Skip for now'),
-        ),
-        const SizedBox(height: Space.sm),
+        const SizedBox(height: Space.xs),
         Text(
-          'Skipped students stay in the queue. If they aren\'t called this '
-          'session, they get priority next session.',
+          note ?? 'Your turn to answer',
           textAlign: TextAlign.center,
-          style: text.bodySmall,
+          style: text.bodyMedium?.copyWith(color: AppColors.muted),
         ),
+        const SizedBox(height: Space.xl),
+        FilledButton(
+          key: const Key('letAnswer'),
+          onPressed: onAnswer,
+          child: const Text('Let them answer'),
+        ),
+        const SizedBox(height: Space.xs),
+        TextButton(onPressed: onSkip, child: const Text('Skip for now')),
       ],
     );
   }
@@ -244,23 +222,22 @@ class _ScoreStep extends StatelessWidget {
     }.toList()
       ..sort();
 
-    String presetLabel(int v) {
-      if (v == 0) return 'No points';
-      if (v == defaultPoints) return 'Full · $v';
-      if (v < defaultPoints) return 'Partial · $v';
-      return 'Bonus · $v';
-    }
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('SCORE', textAlign: TextAlign.center, style: text.labelSmall),
-        const SizedBox(height: Space.sm),
         Text(
-          'How did $name do?',
+          name,
           textAlign: TextAlign.center,
           style: text.titleLarge,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Points for this answer',
+          textAlign: TextAlign.center,
+          style: text.bodyMedium?.copyWith(color: AppColors.muted),
         ),
         const SizedBox(height: Space.xl),
         Row(
@@ -272,19 +249,11 @@ class _ScoreStep extends StatelessWidget {
               icon: const Icon(Icons.remove_rounded),
             ),
             SizedBox(
-              width: 120,
-              child: Column(
-                children: [
-                  Text(
-                    '$points',
-                    textAlign: TextAlign.center,
-                    style: text.displaySmall,
-                  ),
-                  Text(
-                    points == 1 ? 'point' : 'points',
-                    style: text.bodySmall,
-                  ),
-                ],
+              width: 96,
+              child: Text(
+                '$points',
+                textAlign: TextAlign.center,
+                style: text.displaySmall,
               ),
             ),
             IconButton.outlined(
@@ -297,29 +266,28 @@ class _ScoreStep extends StatelessWidget {
           ],
         ),
         const SizedBox(height: Space.lg),
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: Space.sm,
-          runSpacing: Space.sm,
-          children: [
+        SegmentedButton<int>(
+          showSelectedIcon: false,
+          emptySelectionAllowed: true,
+          segments: [
             for (final v in presets)
-              ChoiceChip(
-                label: Text(presetLabel(v)),
-                selected: points == v,
-                onSelected: (_) => onChanged(v),
-              ),
+              ButtonSegment(value: v, label: Text('$v')),
           ],
+          selected: {if (presets.contains(points)) points},
+          onSelectionChanged: (s) {
+            if (s.isNotEmpty) onChanged(s.first);
+          },
         ),
         const SizedBox(height: Space.xl),
-        FilledButton.icon(
+        FilledButton(
+          key: const Key('saveScore'),
           onPressed: onSave,
-          icon: const Icon(Icons.check_rounded),
-          label: Text('Give $points ${points == 1 ? 'point' : 'points'}'),
+          child: Text(points == 1 ? 'Give 1 point' : 'Give $points points'),
         ),
-        const SizedBox(height: Space.sm),
-        OutlinedButton(
+        const SizedBox(height: Space.xs),
+        TextButton(
           onPressed: onNoAnswer,
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.red),
+          style: TextButton.styleFrom(foregroundColor: AppColors.red),
           child: const Text('Didn\'t answer'),
         ),
       ],

@@ -1,7 +1,30 @@
 import 'package:flutter/material.dart';
 
-import '../models/call_outcome.dart';
 import '../theme/app_theme.dart';
+
+/// Max width for page content, so tablets and landscape phones get a
+/// readable column instead of edge-to-edge rows and buttons.
+const double kContentMaxWidth = 640;
+
+/// Centers [child] and caps it at [kContentMaxWidth].
+class ContentWidth extends StatelessWidget {
+  const ContentWidth({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      // Size to the child vertically so this also works in bottom bars.
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+        child: child,
+      ),
+    );
+  }
+}
 
 /// Initials avatar used for every student.
 class StudentAvatar extends StatelessWidget {
@@ -9,14 +32,12 @@ class StudentAvatar extends StatelessWidget {
     super.key,
     required this.name,
     this.size = 40,
-    this.background,
-    this.foreground,
+    this.highlighted = false,
   });
 
   final String name;
   final double size;
-  final Color? background;
-  final Color? foreground;
+  final bool highlighted;
 
   static String initials(String name) {
     final parts =
@@ -34,32 +55,33 @@ class StudentAvatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: background ?? AppColors.navy.withValues(alpha: 0.08),
+        color: highlighted
+            ? AppColors.navy
+            : AppColors.navy.withValues(alpha: 0.07),
       ),
       child: Text(
         initials(name),
         style: TextStyle(
-          fontSize: size * 0.38,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-          color: foreground ?? AppColors.navy,
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w600,
+          color: highlighted ? Colors.white : AppColors.navy,
         ),
       ),
     );
   }
 }
 
-/// Uppercase section label with an optional count.
+/// Section heading above a group of rows.
 class SectionHeader extends StatelessWidget {
-  const SectionHeader(this.title, {super.key, this.count, this.trailing});
+  const SectionHeader(this.title, {super.key, this.count, this.caption});
 
   final String title;
   final int? count;
-  final Widget? trailing;
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelSmall;
+    final text = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         Space.page,
@@ -68,14 +90,26 @@ class SectionHeader extends StatelessWidget {
         Space.sm,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
-          Text(title.toUpperCase(), style: style),
+          Text(title, style: text.titleSmall),
           if (count != null) ...[
-            const SizedBox(width: Space.sm),
-            Text('$count', style: style?.copyWith(color: AppColors.ink)),
+            const SizedBox(width: 6),
+            Text('$count', style: text.bodySmall),
           ],
-          const Spacer(),
-          ?trailing,
+          if (caption != null) ...[
+            const SizedBox(width: Space.sm),
+            Expanded(
+              child: Text(
+                caption!,
+                style: text.bodySmall,
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -97,14 +131,14 @@ class PageTitle extends StatelessWidget {
         Space.page,
         Space.xl,
         Space.page,
-        Space.sm,
+        Space.xs,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: text.headlineMedium),
           if (subtitle != null) ...[
-            const SizedBox(height: Space.xs),
+            const SizedBox(height: 2),
             Text(subtitle!, style: text.bodyMedium?.copyWith(
               color: AppColors.muted,
             )),
@@ -115,76 +149,32 @@ class PageTitle extends StatelessWidget {
   }
 }
 
-/// Small rounded label, e.g. a status.
-class Pill extends StatelessWidget {
-  const Pill({
-    super.key,
-    required this.label,
-    required this.color,
-    this.icon,
-    this.filled = false,
-  });
+/// A card that holds a list of rows separated by hairlines.
+class GroupCard extends StatelessWidget {
+  const GroupCard({super.key, required this.children, this.indent = 68});
 
-  final String label;
-  final Color color;
-  final IconData? icon;
-  final bool filled;
+  final List<Widget> children;
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
-    final fg = filled ? Colors.white : color;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 3),
-      decoration: BoxDecoration(
-        color: filled ? color : color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 13, color: fg),
-            const SizedBox(width: 4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.page),
+      child: Card(
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) Divider(indent: indent),
+              children[i],
+            ],
           ],
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: fg, fontSize: 11.5),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class PriorityPill extends StatelessWidget {
-  const PriorityPill({super.key});
-
-  @override
-  Widget build(BuildContext context) => const Pill(
-        label: 'Priority',
-        color: AppColors.navy,
-        icon: Icons.flag_rounded,
-      );
-}
-
-Color outcomeColor(CallOutcome outcome) => switch (outcome) {
-      CallOutcome.notCalled => AppColors.muted,
-      CallOutcome.pending => AppColors.amberInk,
-      CallOutcome.answered => AppColors.teal,
-      CallOutcome.notAnswered => AppColors.red,
-    };
-
-IconData outcomeIcon(CallOutcome outcome) => switch (outcome) {
-      CallOutcome.notCalled => Icons.schedule_rounded,
-      CallOutcome.pending => Icons.record_voice_over_rounded,
-      CallOutcome.answered => Icons.check_circle_rounded,
-      CallOutcome.notAnswered => Icons.remove_circle_rounded,
-    };
-
-/// A label/value pair used in summary cards.
+/// A label/value pair used in summary rows.
 class Stat extends StatelessWidget {
   const Stat({super.key, required this.label, required this.value});
 
@@ -198,36 +188,40 @@ class Stat extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(value, style: text.titleLarge),
-        const SizedBox(height: 2),
-        Text(label, style: text.bodySmall),
+        Text(
+          label,
+          style: text.bodySmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
 }
 
-/// Points progress bar toward a reward.
-class PointsProgress extends StatelessWidget {
-  const PointsProgress({
+/// Thin progress bar toward a target.
+class ProgressBar extends StatelessWidget {
+  const ProgressBar({
     super.key,
-    required this.earned,
-    required this.required,
+    required this.value,
+    required this.max,
     this.height = 6,
   });
 
-  final int earned;
-  final int required;
+  final int value;
+  final int max;
   final double height;
 
   @override
   Widget build(BuildContext context) {
-    final value = required <= 0 ? 1.0 : (earned / required).clamp(0.0, 1.0);
+    final fraction = max <= 0 ? 0.0 : (value / max).clamp(0.0, 1.0);
     return ClipRRect(
       borderRadius: BorderRadius.circular(height),
       child: LinearProgressIndicator(
-        value: value,
+        value: fraction,
         minHeight: height,
         backgroundColor: AppColors.line,
-        color: value >= 1 ? AppColors.teal : AppColors.amber,
+        color: fraction >= 1 ? AppColors.teal : AppColors.amber,
       ),
     );
   }
@@ -236,13 +230,11 @@ class PointsProgress extends StatelessWidget {
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
-    required this.icon,
     required this.title,
     required this.message,
     this.action,
   });
 
-  final IconData icon;
   final String title;
   final String message;
   final Widget? action;
@@ -251,84 +243,72 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(Space.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.navy.withValues(alpha: 0.06),
-                shape: BoxShape.circle,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.all(Space.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: text.titleLarge, textAlign: TextAlign.center),
+              const SizedBox(height: Space.sm),
+              Text(
+                message,
+                style: text.bodyMedium?.copyWith(color: AppColors.muted),
+                textAlign: TextAlign.center,
               ),
-              child: Icon(icon, size: 32, color: AppColors.navy),
-            ),
-            const SizedBox(height: Space.lg),
-            Text(title, style: text.titleLarge, textAlign: TextAlign.center),
-            const SizedBox(height: Space.sm),
-            Text(
-              message,
-              style: text.bodyMedium?.copyWith(color: AppColors.muted),
-              textAlign: TextAlign.center,
-            ),
-            if (action != null) ...[
-              const SizedBox(height: Space.xl),
-              action!,
+              if (action != null) ...[
+                const SizedBox(height: Space.xl),
+                action!,
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Info banner with an icon, used for rules and notices.
-class NoticeCard extends StatelessWidget {
-  const NoticeCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.color = AppColors.navy,
-  });
+/// A primary action pinned to the bottom of a screen.
+class BottomAction extends StatelessWidget {
+  const BottomAction({super.key, required this.child});
 
-  final IconData icon;
-  final String title;
-  final String message;
-  final Color color;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(Space.lg),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: const Border(top: BorderSide(color: AppColors.line)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: text.titleSmall),
-                const SizedBox(height: 2),
-                Text(message, style: text.bodySmall),
-              ],
+      child: SafeArea(
+        top: false,
+        child: ContentWidth(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.page,
+              Space.md,
+              Space.page,
+              Space.md,
+            ),
+            child: Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: child,
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
+
+/// Style for the single main action on a screen.
+ButtonStyle primaryActionStyle() =>
+    FilledButton.styleFrom(minimumSize: const Size.fromHeight(48));
 
 Future<bool> confirmDialog(
   BuildContext context, {

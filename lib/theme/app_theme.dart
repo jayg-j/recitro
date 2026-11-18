@@ -48,7 +48,10 @@ abstract final class AppTheme {
       surfaceContainerLow: const Color(0xFFFBFAF7),
     );
 
-    final text = _textTheme();
+    // Merge onto the platform typography so every style carries the system
+    // font family (Roboto on Android, SF on iOS) — including styles passed
+    // directly to buttons and app bars.
+    final text = ThemeData(useMaterial3: true).textTheme.merge(_textTheme());
 
     return ThemeData(
       useMaterial3: true,
@@ -62,14 +65,14 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0.5,
         foregroundColor: AppColors.ink,
-        titleTextStyle: text.titleLarge,
+        titleTextStyle: text.titleMedium?.copyWith(fontSize: 18),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         color: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppColors.line),
         ),
         clipBehavior: Clip.antiAlias,
@@ -80,7 +83,7 @@ abstract final class AppTheme {
         space: 1,
       ),
       listTileTheme: ListTileThemeData(
-        titleTextStyle: text.titleMedium,
+        titleTextStyle: text.bodyLarge,
         subtitleTextStyle: text.bodySmall,
         iconColor: AppColors.muted,
         contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg),
@@ -111,28 +114,39 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 48),
-          padding: const EdgeInsets.symmetric(horizontal: Space.xl),
+          minimumSize: const Size(64, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           textStyle: text.labelLarge,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 48),
-          padding: const EdgeInsets.symmetric(horizontal: Space.xl),
+          minimumSize: const Size(64, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           textStyle: text.labelLarge,
           foregroundColor: AppColors.ink,
           side: const BorderSide(color: AppColors.line),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: const Size(48, 44),
+          minimumSize: const Size(48, 40),
           textStyle: text.labelLarge,
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          textStyle: text.labelLarge,
+          side: const BorderSide(color: AppColors.line),
+          selectedBackgroundColor: AppColors.navy,
+          selectedForegroundColor: Colors.white,
+          foregroundColor: AppColors.ink,
+          visualDensity: VisualDensity.compact,
         ),
       ),
       chipTheme: ChipThemeData(
@@ -201,14 +215,14 @@ abstract final class AppTheme {
       displaySmall: TextStyle(
         fontSize: 40,
         height: 1.1,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -1,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.8,
         color: ink,
       ),
       headlineMedium: TextStyle(
         fontSize: 28,
         height: 1.2,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.6,
         color: ink,
       ),

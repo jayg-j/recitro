@@ -51,20 +51,27 @@ class _RewardDialogState extends State<_RewardDialog> {
     _label ??= TextEditingController(text: session.rewardLabel);
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(Space.xl),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.xl,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 380),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Space.xl),
+          padding: const EdgeInsets.fromLTRB(
+            Space.xl,
+            Space.xl,
+            Space.xl,
+            Space.lg,
+          ),
           child: RewardPanel(
             studentName: student.name,
-            sessionName: session.name,
             rewardLabel: session.rewardLabel,
             earned: state.pointsEarned,
             required: session.pointsRequiredForReward,
             canClaim: store.canClaimReward(session, widget.studentId),
-            claimed: state.rewardClaimed &&
-                state.outcome == CallOutcome.answered,
+            claimed:
+                state.rewardClaimed && state.outcome == CallOutcome.answered,
             labelController: _label!,
             onGive: () async {
               await store.claimReward(
@@ -75,9 +82,7 @@ class _RewardDialogState extends State<_RewardDialog> {
               if (context.mounted) {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Reward given to ${student.name}'),
-                  ),
+                  SnackBar(content: Text('Reward given to ${student.name}')),
                 );
               }
             },
@@ -95,7 +100,6 @@ class RewardPanel extends StatelessWidget {
   const RewardPanel({
     super.key,
     required this.studentName,
-    required this.sessionName,
     required this.rewardLabel,
     required this.earned,
     required this.required,
@@ -108,7 +112,6 @@ class RewardPanel extends StatelessWidget {
   });
 
   final String studentName;
-  final String sessionName;
   final String rewardLabel;
   final int earned;
   final int required;
@@ -124,86 +127,66 @@ class RewardPanel extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final remaining = (required - earned).clamp(0, required);
 
+    final String message;
+    if (claimed) {
+      message = 'Reward already given.';
+    } else if (canClaim) {
+      message = 'Earned $rewardLabel.';
+    } else {
+      message =
+          '$remaining more ${remaining == 1 ? 'point' : 'points'} to earn $rewardLabel.';
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(studentName, style: text.titleLarge),
+        const SizedBox(height: Space.lg),
         Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: (canClaim ? AppColors.amber : AppColors.navy)
-                    .withValues(alpha: canClaim ? 1 : 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                canClaim ? Icons.redeem_rounded : Icons.military_tech_rounded,
-                color: canClaim ? AppColors.navy : AppColors.navy,
-              ),
-            ),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(studentName, style: text.titleLarge),
-                  Text(sessionName, style: text.bodySmall),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Space.xl),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           children: [
             Text('$earned', style: text.displaySmall),
-            Padding(
-              padding: const EdgeInsets.only(left: Space.xs, bottom: 6),
-              child: Text('/ $required pts', style: text.titleMedium?.copyWith(
-                color: AppColors.muted,
-              )),
+            const SizedBox(width: 6),
+            Text(
+              '/ $required pts',
+              style: text.titleMedium?.copyWith(color: AppColors.muted),
             ),
           ],
         ),
+        const SizedBox(height: Space.md),
+        ProgressBar(value: earned, max: required),
         const SizedBox(height: Space.sm),
-        PointsProgress(earned: earned, required: required, height: 8),
-        const SizedBox(height: Space.sm),
-        Text(
-          claimed
-              ? 'Reward already given for these points.'
-              : canClaim
-                  ? 'Reward unlocked.'
-                  : '$remaining more ${remaining == 1 ? 'point' : 'points'} to earn "$rewardLabel".',
-          style: text.bodySmall,
-        ),
+        Text(message, style: text.bodyMedium?.copyWith(
+          color: AppColors.muted,
+        )),
         if (canClaim) ...[
           const SizedBox(height: Space.xl),
           TextField(
             controller: labelController,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Reward to give',
-              helperText: 'Change it if you are giving something different.',
-            ),
+            decoration: const InputDecoration(labelText: 'Reward to give'),
           ),
           const SizedBox(height: Space.lg),
-          FilledButton.icon(
+          FilledButton(
+            key: const Key('giveReward'),
             onPressed: onGive,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.amber,
-              foregroundColor: AppColors.navy,
-            ),
-            icon: const Icon(Icons.redeem_rounded),
-            label: const Text('Give reward'),
+            child: const Text('Give reward'),
           ),
-          const SizedBox(height: Space.sm),
-          TextButton(onPressed: onClose, child: const Text('Later')),
+          const SizedBox(height: Space.xs),
+          TextButton(
+            key: const Key('rewardClose'),
+            onPressed: onClose,
+            child: const Text('Later'),
+          ),
         ] else ...[
           const SizedBox(height: Space.xl),
-          FilledButton(onPressed: onClose, child: Text(closeLabel)),
+          FilledButton(
+            key: const Key('rewardClose'),
+            onPressed: onClose,
+            child: Text(closeLabel),
+          ),
         ],
       ],
     );

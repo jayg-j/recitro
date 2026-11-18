@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../data/recitro_store.dart';
 import '../flows/session_form_screen.dart';
 import '../flows/student_create_flow.dart';
-import '../theme/app_theme.dart';
 import 'sessions_tab.dart';
 import 'students_tab.dart';
 
@@ -46,6 +45,9 @@ class _MainShellState extends State<MainShell> {
         : store.students.isEmpty;
 
     final fab = tabEmpty ? null : FloatingActionButton.extended(
+      key: Key(
+        _section == ShellSection.sessions ? 'newSessionFab' : 'addStudentFab',
+      ),
       onPressed: _onAdd,
       icon: const Icon(Icons.add_rounded),
       label: Text(
@@ -63,10 +65,7 @@ class _MainShellState extends State<MainShell> {
               selectedIndex: _section.index,
               onDestinationSelected: (i) =>
                   setState(() => _section = ShellSection.values[i]),
-              leading: const Padding(
-                padding: EdgeInsets.symmetric(vertical: Space.xl),
-                child: _Logo(onDark: true),
-              ),
+              groupAlignment: -0.9,
               destinations: const [
                 NavigationRailDestination(
                   icon: Icon(Icons.auto_stories_outlined),
@@ -110,24 +109,3 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-class _Logo extends StatelessWidget {
-  const _Logo({this.onDark = false});
-
-  final bool onDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: onDark ? AppColors.amber : AppColors.navy,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(
-        Icons.school_rounded,
-        color: onDark ? AppColors.navy : Colors.white,
-      ),
-    );
-  }
-}

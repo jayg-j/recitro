@@ -73,19 +73,19 @@ void main() {
     expect(find.text('Science — Day 2'), findsOneWidget);
 
     await tapAndSettle(find.text('Science — Day 2'));
-    expect(find.text('Priority students go first'), findsOneWidget);
-    expect(find.text('Call next · priority first'), findsOneWidget);
+    expect(find.text('Priority'), findsOneWidget);
 
-    await tapAndSettle(find.text('Call next · priority first'));
-    expect(find.text('NOW CALLING'), findsOneWidget);
+    await tapAndSettle(find.byKey(const Key('callNext')));
+    // A priority student (Ben or Cy) is called first.
+    expect(find.text('Missed last session'), findsOneWidget);
 
     await tapAndSettle(find.text('Let them answer'));
-    expect(find.text('SCORE'), findsOneWidget);
+    expect(find.text('Points for this answer'), findsOneWidget);
 
     await tapAndSettle(find.text('Give 5 points'));
-    expect(find.text('Give reward'), findsOneWidget);
+    expect(find.byKey(const Key('giveReward')), findsOneWidget);
 
-    await tapAndSettle(find.text('Give reward'));
+    await tapAndSettle(find.byKey(const Key('giveReward')));
     expect(store.ledger.length, 1);
 
     // Edit form opens and renders.

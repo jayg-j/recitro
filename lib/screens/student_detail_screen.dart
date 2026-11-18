@@ -39,107 +39,93 @@ class StudentDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: Space.xxl),
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.page),
-            child: Row(
-              children: [
-                StudentAvatar(name: student.name, size: 64),
-                const SizedBox(width: Space.lg),
-                Expanded(
-                  child: Text(student.name, style: text.headlineSmall),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: Space.xl),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.page),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(Space.lg),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Stat(label: 'points earned', value: '$total'),
-                    ),
-                    Expanded(
-                      child: Stat(
-                        label: 'rewards received',
-                        value: '${history.length}',
-                      ),
-                    ),
-                    Expanded(
-                      child: Stat(
-                        label: 'in progress',
-                        value: '${inProgress.length}',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (inProgress.isNotEmpty) ...[
-            SectionHeader('Rewards in progress', count: inProgress.length),
+      body: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: Space.xxl),
+          children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.page),
-              child: Card(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < inProgress.length; i++) ...[
-                      if (i > 0) const Divider(),
-                      _ProgressRow(
-                        session: inProgress[i],
-                        studentId: studentId,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-          SectionHeader('Reward history', count: history.length),
-          if (history.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.page),
-              child: Text(
-                'No rewards yet. Rewards appear here once you give them.',
-                style: text.bodySmall,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.page),
-              child: Card(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < history.length; i++) ...[
-                      if (i > 0) const Divider(indent: 56),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.military_tech_rounded,
-                          color: AppColors.amberInk,
-                        ),
-                        title: Text(history[i].rewardLabel),
-                        subtitle: Text(
-                          '${history[i].sessionName} · ${_date(history[i].earnedAt)}',
-                        ),
-                        trailing: Text(
-                          '+${history[i].points}',
-                          style: text.titleMedium?.copyWith(
-                            color: AppColors.teal,
+              child: Row(
+                children: [
+                  StudentAvatar(name: student.name, size: 56),
+                  const SizedBox(width: Space.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(student.name, style: text.headlineSmall),
+                        if (history.isNotEmpty)
+                          Text(
+                            '$total pts earned · ${history.length} '
+                            '${history.length == 1 ? 'reward' : 'rewards'}',
+                            style: text.bodyMedium?.copyWith(
+                              color: AppColors.muted,
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+            if (inProgress.isNotEmpty) ...[
+              const SectionHeader('In progress'),
+              GroupCard(
+                indent: Space.lg,
+                children: [
+                  for (final s in inProgress)
+                    _ProgressRow(session: s, studentId: studentId),
+                ],
+              ),
+            ],
+            const SectionHeader('Rewards received'),
+            if (history.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.page),
+                child: Text('None yet.', style: text.bodyMedium?.copyWith(
+                  color: AppColors.muted,
+                )),
+              )
+            else
+              GroupCard(
+                indent: Space.lg,
+                children: [
+                  for (final e in history)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Space.lg,
+                        vertical: Space.md,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(e.rewardLabel, style: text.bodyLarge),
+                                Text(
+                                  '${e.sessionName} · ${_date(e.earnedAt)}',
+                                  style: text.bodySmall,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: Space.md),
+                          Text(
+                            '+${e.points}',
+                            style: text.titleSmall?.copyWith(
+                              color: AppColors.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -149,7 +135,7 @@ class StudentDetailScreen extends StatelessWidget {
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
-    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+    return '${months[d.month - 1]} ${d.day}';
   }
 }
 
@@ -167,7 +153,12 @@ class _ProgressRow extends StatelessWidget {
     final canClaim = store.canClaimReward(session, studentId);
 
     return Padding(
-      padding: const EdgeInsets.all(Space.lg),
+      padding: const EdgeInsets.fromLTRB(
+        Space.lg,
+        Space.md,
+        Space.sm,
+        Space.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -177,37 +168,46 @@ class _ProgressRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(session.rewardLabel, style: text.titleSmall),
-                    Text(session.name, style: text.bodySmall),
+                    Text(session.rewardLabel, style: text.bodyLarge),
+                    Text(
+                      session.name,
+                      style: text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               if (canClaim)
-                FilledButton.icon(
+                TextButton(
                   onPressed: () => showRewardDialog(
                     context: context,
                     sessionId: session.id,
                     studentId: studentId,
                   ),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    backgroundColor: AppColors.amber,
-                    foregroundColor: AppColors.navy,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.amberInk,
                   ),
-                  icon: const Icon(Icons.redeem_rounded, size: 18),
-                  label: const Text('Give'),
+                  child: const Text('Give reward'),
                 )
               else
-                Text(
-                  '${state.pointsEarned}/${session.pointsRequiredForReward} pts',
-                  style: text.labelMedium?.copyWith(color: AppColors.muted),
+                Padding(
+                  padding: const EdgeInsets.only(right: Space.sm),
+                  child: Text(
+                    '${state.pointsEarned}/${session.pointsRequiredForReward}',
+                    style: text.bodySmall,
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: Space.md),
-          PointsProgress(
-            earned: state.pointsEarned,
-            required: session.pointsRequiredForReward,
+          const SizedBox(height: Space.sm),
+          Padding(
+            padding: const EdgeInsets.only(right: Space.sm),
+            child: ProgressBar(
+              value: state.pointsEarned,
+              max: session.pointsRequiredForReward,
+              height: 4,
+            ),
           ),
         ],
       ),

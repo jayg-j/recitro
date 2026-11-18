@@ -29,9 +29,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Resume a call that was in progress when the app closed.
-      final pending =
-          context.read<RecitroStore>().sessionById(widget.sessionId)
-              ?.pendingStudentId;
+      final pending = context
+          .read<RecitroStore>()
+          .sessionById(widget.sessionId)
+          ?.pendingStudentId;
       if (pending != null) _openCallFlow(pending);
     });
   }
@@ -67,10 +68,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Future<void> _delete(RecitationSession session) async {
     final ok = await confirmDialog(
       context,
-      title: 'Delete session?',
-      message:
-          '"${session.name}" and its call history will be removed. Rewards '
-          'already given stay on each student\'s record.',
+      title: 'Delete this session?',
+      message: 'Rewards already given stay on each student\'s record.',
       confirmLabel: 'Delete',
       destructive: true,
     );
@@ -84,16 +83,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final store = context.read<RecitroStore>();
     final session = store.sessionById(widget.sessionId);
     if (session == null) return;
-    final state = session.studentStates[student.id];
     final canClaim = store.canClaimReward(session, student.id);
     final busy = session.pendingStudentId != null;
     final text = Theme.of(context).textTheme;
 
     showModalBottomSheet<void>(
       context: context,
+      constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
       builder: (sheet) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.only(bottom: Space.md),
+          padding: const EdgeInsets.only(bottom: Space.sm),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -103,37 +102,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   Space.page,
                   0,
                   Space.page,
-                  Space.md,
+                  Space.sm,
                 ),
-                child: Row(
-                  children: [
-                    StudentAvatar(name: student.name, size: 44),
-                    const SizedBox(width: Space.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(student.name, style: text.titleMedium),
-                          Text(
-                            _statusLine(store, session, student.id),
-                            style: text.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                child: Text(student.name, style: text.titleMedium),
               ),
-              const Divider(),
               ListTile(
                 enabled: !busy,
-                leading: const Icon(Icons.record_voice_over_rounded),
-                title: Text('Call ${student.name.split(' ').first} now'),
-                subtitle: Text(
-                  state?.outcome == CallOutcome.notCalled
-                      ? 'Skip the random pick and call this student.'
-                      : 'Call again in this session.',
-                ),
+                leading: const Icon(Icons.record_voice_over_outlined),
+                title: const Text('Call now'),
                 onTap: () {
                   Navigator.pop(sheet);
                   _callSpecific(student.id);
@@ -141,12 +117,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               ),
               if (canClaim)
                 ListTile(
-                  leading: const Icon(
-                    Icons.redeem_rounded,
-                    color: AppColors.amberInk,
-                  ),
+                  leading: const Icon(Icons.redeem_outlined),
                   title: const Text('Give reward'),
-                  subtitle: Text(session.rewardLabel),
                   onTap: () {
                     Navigator.pop(sheet);
                     showRewardDialog(
@@ -157,13 +129,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.person_rounded),
-                title: const Text('View student'),
+                leading: const Icon(Icons.person_outline_rounded),
+                title: const Text('View profile'),
                 onTap: () {
                   Navigator.pop(sheet);
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => StudentDetailScreen(studentId: student.id),
+                      builder: (_) =>
+                          StudentDetailScreen(studentId: student.id),
                     ),
                   );
                 },
@@ -175,31 +148,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  static String _statusLine(
-    RecitroStore store,
-    RecitationSession session,
-    String studentId,
-  ) {
-    final state = session.studentStates[studentId];
-    if (state == null) return '';
-    final pts = '${state.pointsEarned}/${session.pointsRequiredForReward} pts';
-    return switch (state.outcome) {
-      CallOutcome.notCalled => store.isPriority(session, studentId)
-          ? 'Not called last session'
-          : 'Waiting to be called',
-      CallOutcome.pending => 'Being called now',
-      CallOutcome.answered => state.rewardClaimed && state.pointsEarned == 0
-          ? 'Answered · reward given'
-          : 'Answered · $pts',
-      CallOutcome.notAnswered => 'Didn\'t answer',
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     final store = context.watch<RecitroStore>();
     final session = store.sessionById(widget.sessionId);
-    final text = Theme.of(context).textTheme;
 
     if (session == null) {
       return const Scaffold(body: SizedBox.shrink());
@@ -221,7 +173,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
 
     final canCall = store.hasCallableStudents(session);
-    final calledCount = store.calledCount(session);
 
     return Scaffold(
       appBar: AppBar(
@@ -230,7 +181,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           IconButton(
             tooltip: 'Edit session',
             onPressed: () => openSessionForm(context, session: session),
-            icon: const Icon(Icons.tune_rounded),
+            icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
             tooltip: 'Delete session',
@@ -242,114 +193,68 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       ),
       bottomNavigationBar: students.isEmpty
           ? null
-          : SafeArea(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(
-                  Space.page,
-                  Space.md,
-                  Space.page,
-                  Space.md,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: AppColors.line)),
-                ),
-                child: FilledButton.icon(
-                  onPressed: canCall ? _callNext : null,
-                  icon: const Icon(Icons.casino_rounded),
-                  label: Text(
-                    canCall
-                        ? (priority.isNotEmpty
-                            ? 'Call next · priority first'
-                            : 'Call next student')
-                        : 'Everyone has been called',
-                  ),
+          : BottomAction(
+              child: FilledButton(
+                key: const Key('callNext'),
+                style: primaryActionStyle(),
+                onPressed: canCall ? _callNext : null,
+                child: Text(
+                  canCall || session.pendingStudentId != null
+                      ? 'Call next student'
+                      : 'Everyone\'s been called',
                 ),
               ),
             ),
       body: students.isEmpty
           ? const EmptyState(
-              icon: Icons.people_outline_rounded,
               title: 'No students yet',
               message: 'Add students from the Students tab to start calling.',
             )
-          : ListView(
-              padding: const EdgeInsets.only(bottom: Space.xl),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.page,
-                    Space.sm,
-                    Space.page,
-                    0,
-                  ),
-                  child: _SummaryCard(
+          : ContentWidth(
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: Space.xl),
+                children: [
+                  _Summary(
                     session: session,
-                    called: calledCount,
+                    called: store.calledCount(session),
                     total: students.length,
                   ),
-                ),
-                if (priority.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      Space.page,
-                      Space.md,
-                      Space.page,
-                      0,
+                  if (priority.isNotEmpty) ...[
+                    SectionHeader(
+                      'Priority',
+                      count: priority.length,
+                      caption: 'Called first',
                     ),
-                    child: NoticeCard(
-                      icon: Icons.flag_rounded,
-                      title: 'Priority students go first',
-                      message: session.previousSessionName == null
-                          ? 'These students weren\'t called in the previous session.'
-                          : 'These students weren\'t called in "${session.previousSessionName}".',
-                    ),
-                  ),
-                if (priority.isNotEmpty) ...[
-                  SectionHeader('Priority', count: priority.length),
-                  _StudentGroup(
-                    students: priority,
-                    session: session,
-                    onTap: _showStudentActions,
-                  ),
+                    _rows(priority, session),
+                  ],
+                  if (waiting.isNotEmpty) ...[
+                    SectionHeader('Waiting', count: waiting.length),
+                    _rows(waiting, session),
+                  ],
+                  if (called.isNotEmpty) ...[
+                    SectionHeader('Called', count: called.length),
+                    _rows(called, session),
+                  ],
                 ],
-                if (waiting.isNotEmpty) ...[
-                  SectionHeader('Waiting', count: waiting.length),
-                  _StudentGroup(
-                    students: waiting,
-                    session: session,
-                    onTap: _showStudentActions,
-                  ),
-                ],
-                if (called.isNotEmpty) ...[
-                  SectionHeader('Called', count: called.length),
-                  _StudentGroup(
-                    students: called,
-                    session: session,
-                    onTap: _showStudentActions,
-                  ),
-                ],
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.page,
-                    Space.lg,
-                    Space.page,
-                    0,
-                  ),
-                  child: Text(
-                    'Tap a student to call them directly or give a reward.',
-                    style: text.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
+              ),
             ),
     );
   }
+
+  Widget _rows(List<Student> list, RecitationSession session) => GroupCard(
+        children: [
+          for (final s in list)
+            _StudentRow(
+              student: s,
+              session: session,
+              onTap: () => _showStudentActions(s),
+            ),
+        ],
+      );
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _Summary extends StatelessWidget {
+  const _Summary({
     required this.session,
     required this.called,
     required this.total,
@@ -362,108 +267,42 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final rules = <String>[
-      if (session.allowRecallUnanswered) 'Re-calls students who didn\'t answer',
-      if (session.allowRecallAnswered) 'May re-call students who answered',
-    ];
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(Space.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.amber.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.military_tech_rounded,
-                    color: AppColors.amberInk,
-                  ),
-                ),
-                const SizedBox(width: Space.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('REWARD', style: text.labelSmall),
-                      Text(
-                        session.rewardLabel,
-                        style: text.titleMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: Space.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: Stat(
-                    label: 'pts per answer',
-                    value: '${session.pointsPerAnswer}',
-                  ),
-                ),
-                Expanded(
-                  child: Stat(
-                    label: 'pts to earn',
-                    value: '${session.pointsRequiredForReward}',
-                  ),
-                ),
-                Expanded(
-                  child: Stat(label: 'called', value: '$called/$total'),
-                ),
-              ],
-            ),
-            const SizedBox(height: Space.md),
-            PointsProgress(earned: called, required: total == 0 ? 1 : total),
-            if (rules.isNotEmpty) ...[
-              const SizedBox(height: Space.md),
-              Text(rules.join(' · '), style: text.bodySmall),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StudentGroup extends StatelessWidget {
-  const _StudentGroup({
-    required this.students,
-    required this.session,
-    required this.onTap,
-  });
-
-  final List<Student> students;
-  final RecitationSession session;
-  final ValueChanged<Student> onTap;
-
-  @override
-  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.page),
+      padding: const EdgeInsets.fromLTRB(Space.page, Space.sm, Space.page, 0),
       child: Card(
-        child: Column(
-          children: [
-            for (var i = 0; i < students.length; i++) ...[
-              if (i > 0) const Divider(indent: 68),
-              _StudentRow(
-                student: students[i],
-                session: session,
-                onTap: () => onTap(students[i]),
+        child: Padding(
+          padding: const EdgeInsets.all(Space.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Reward', style: text.bodySmall),
+              Text(session.rewardLabel, style: text.titleMedium),
+              const SizedBox(height: Space.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: Stat(
+                      label: 'Per answer',
+                      value: '${session.pointsPerAnswer}',
+                    ),
+                  ),
+                  const SizedBox(width: Space.md),
+                  Expanded(
+                    child: Stat(
+                      label: 'To earn',
+                      value: '${session.pointsRequiredForReward}',
+                    ),
+                  ),
+                  const SizedBox(width: Space.md),
+                  Expanded(
+                    child: Stat(label: 'Called', value: '$called/$total'),
+                  ),
+                ],
               ),
+              const SizedBox(height: Space.md),
+              ProgressBar(value: called, max: total, height: 4),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -488,92 +327,71 @@ class _StudentRow extends StatelessWidget {
     final state = session.studentStates[student.id];
     final outcome = state?.outcome ?? CallOutcome.notCalled;
     final canClaim = store.canClaimReward(session, student.id);
-    final showProgress = outcome == CallOutcome.answered &&
-        state != null &&
-        !(state.rewardClaimed && state.pointsEarned == 0);
+
+    final String? status = switch (outcome) {
+      CallOutcome.pending => 'Being called',
+      CallOutcome.notAnswered => 'Didn\'t answer',
+      CallOutcome.answered => state!.rewardClaimed && state.pointsEarned == 0
+          ? 'Reward given'
+          : '${state.pointsEarned} of ${session.pointsRequiredForReward} pts',
+      CallOutcome.notCalled => null,
+    };
+    final statusColor =
+        outcome == CallOutcome.notAnswered ? AppColors.red : AppColors.muted;
 
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.lg,
-          vertical: Space.md,
-        ),
-        child: Row(
-          children: [
-            StudentAvatar(
-              name: student.name,
-              background: outcome == CallOutcome.pending
-                  ? AppColors.amber
-                  : null,
-            ),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student.name,
-                    style: text.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(
-                        outcomeIcon(outcome),
-                        size: 14,
-                        color: outcomeColor(outcome),
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          _SessionDetailScreenState._statusLine(
-                            store,
-                            session,
-                            student.id,
-                          ),
-                          style: text.bodySmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (showProgress) ...[
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: 140,
-                      child: PointsProgress(
-                        earned: state.pointsEarned,
-                        required: session.pointsRequiredForReward,
-                        height: 4,
-                      ),
-                    ),
-                  ],
-                ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.lg,
+            vertical: 10,
+          ),
+          child: Row(
+            children: [
+              StudentAvatar(
+                name: student.name,
+                size: 36,
+                highlighted: outcome == CallOutcome.pending,
               ),
-            ),
-            if (canClaim)
-              FilledButton.tonalIcon(
-                onPressed: () => showRewardDialog(
-                  context: context,
-                  sessionId: session.id,
-                  studentId: student.id,
+              const SizedBox(width: Space.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      student.name,
+                      style: text.bodyLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (status != null)
+                      Text(
+                        status,
+                        style: text.bodySmall?.copyWith(color: statusColor),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: Space.md),
-                  backgroundColor: AppColors.amber.withValues(alpha: 0.25),
-                  foregroundColor: AppColors.amberInk,
+              ),
+              if (canClaim)
+                TextButton(
+                  onPressed: () => showRewardDialog(
+                    context: context,
+                    sessionId: session.id,
+                    studentId: student.id,
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.amberInk,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('Give reward'),
                 ),
-                icon: const Icon(Icons.redeem_rounded, size: 18),
-                label: const Text('Reward'),
-              )
-            else if (store.isPriority(session, student.id))
-              const PriorityPill(),
-          ],
+            ],
+          ),
         ),
       ),
     );
