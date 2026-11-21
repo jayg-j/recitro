@@ -29,9 +29,15 @@ jobs:
       - run: flutter pub get
 
       - name: Build release APKs
-        run: flutter build apk --release --no-tree-shake-icons
+        run: |
+          set -o pipefail
+          flutter build apk --release --no-tree-shake-icons 2>&1 | tee build-log.txt
         env:
           CI: true
+
+      - name: Build log (on failure)
+        if: failure()
+        run: tail -n 120 build-log.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: List APK outputs
         run: ls -lah build/app/outputs/flutter-apk/
