@@ -68,6 +68,7 @@ val recitroTargetAbi =
 fun runRecitroEnsureEmulator(phase: String) {
     if (!ensureEmulatorScript.isFile) return
     if (System.getenv("CI") != null) return
+    if (!org.gradle.internal.os.OperatingSystem.current().isWindows) return
     if (!recitroTargetsEmulator) return
     logger.lifecycle("Recitro: $phase — wait for emulator-5554 Package Manager…")
     val process =
