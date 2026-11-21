@@ -96,25 +96,27 @@ fun runRecitroEnsureEmulator(phase: String) {
     }
 }
 
-// Runs even when assembleDebug is UP-TO-DATE so Flutter adb install does not hit "Can't find service: package".
-tasks.register("recitroEnsureEmulatorInstallable") {
-    outputs.upToDateWhen { false }
-    doLast { runRecitroEnsureEmulator("before adb install") }
-}
+// Windows-only: wait for emulator Package Manager before adb install (skipped on CI / Linux).
+if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+    tasks.register("recitroEnsureEmulatorInstallable") {
+        outputs.upToDateWhen { false }
+        doLast { runRecitroEnsureEmulator("before adb install") }
+    }
 
-afterEvaluate {
-    tasks.named("assembleDebug").configure {
-        finalizedBy("recitroEnsureEmulatorInstallable")
-        doFirst { runRecitroEnsureEmulator("before debug assemble") }
-        doLast {
-            val apkDir = recitroRoot.resolve("build/app/outputs/flutter-apk")
-            val split = apkDir.resolve("app-$recitroTargetAbi-debug.apk")
-            val installApk = apkDir.resolve("app-debug.apk")
-            if (split.isFile) {
-                split.copyTo(installApk, overwrite = true)
-                logger.lifecycle(
-                    "Recitro: using ${split.name} for Flutter install (${installApk.length() / 1024 / 1024} MB)"
-                )
+    afterEvaluate {
+        tasks.named("assembleDebug").configure {
+            finalizedBy("recitroEnsureEmulatorInstallable")
+            doFirst { runRecitroEnsureEmulator("before debug assemble") }
+            doLast {
+                val apkDir = recitroRoot.resolve("build/app/outputs/flutter-apk")
+                val split = apkDir.resolve("app-$recitroTargetAbi-debug.apk")
+                val installApk = apkDir.resolve("app-debug.apk")
+                if (split.isFile) {
+                    split.copyTo(installApk, overwrite = true)
+                    logger.lifecycle(
+                        "Recitro: using ${split.name} for Flutter install (${installApk.length() / 1024 / 1024} MB)"
+                    )
+                }
             }
         }
     }
