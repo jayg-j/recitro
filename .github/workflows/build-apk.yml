@@ -5,6 +5,9 @@ on:
   push:
     branches: [master, main]
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -14,7 +17,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - uses: subosito/flutter-action@v2
         with:
@@ -24,21 +27,30 @@ jobs:
       - run: flutter --version
       - run: yes | flutter doctor --android-licenses || true
       - run: flutter pub get
-      - run: flutter build apk --release --no-tree-shake-icons
-        continue-on-error: true
-        id: release_build
+
+      - name: Build release APKs
+        run: flutter build apk --release --no-tree-shake-icons
         env:
           CI: true
-      - name: Build debug APK if release failed
-        if: steps.release_build.outcome == 'failure'
-        run: flutter build apk --debug
-        env:
-          CI: true
-      - name: Fail if no APK produced
-        run: test -n "$(ls -1 build/app/outputs/flutter-apk/*.apk 2>/dev/null | head -1)"
+
+      - name: List APK outputs
+        run: ls -lah build/app/outputs/flutter-apk/
 
       - uses: actions/upload-artifact@v4
         with:
           name: recitro-release-apk
           path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
           retention-days: 30
+
+      - name: Publish phone APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Recitro APK build ${{ github.run_number }}
+          prerelease: true
+          body: "Merged master APK (arm64 for phones). Built by GitHub Actions."
+          files: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
