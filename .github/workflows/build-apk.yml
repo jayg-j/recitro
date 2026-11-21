@@ -29,20 +29,28 @@ jobs:
       - run: flutter pub get
 
       - name: Build release APKs
+        id: build
         run: |
           set -o pipefail
           flutter build apk --release --no-tree-shake-icons 2>&1 | tee build-log.txt
-        env:
-          CI: true
 
-      - name: Build log (on failure)
+      - name: Save build log on failure
         if: failure()
-        run: tail -n 120 build-log.txt >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          mkdir -p ci
+          tail -n 200 build-log.txt > ci/last-apk-build-log.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/last-apk-build-log.txt
+          git diff --staged --quiet || git commit -m "CI: capture APK build failure log"
+          git push
 
       - name: List APK outputs
+        if: success()
         run: ls -lah build/app/outputs/flutter-apk/
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: recitro-release-apk
           path: build/app/outputs/flutter-apk/*.apk
@@ -50,6 +58,7 @@ jobs:
           retention-days: 30
 
       - name: Publish phone APK to GitHub Releases
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
