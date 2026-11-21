@@ -19,19 +19,24 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.38.4"
           cache: true
 
       - run: flutter --version
       - run: yes | flutter doctor --android-licenses || true
       - run: flutter pub get
       - run: flutter build apk --release --no-tree-shake-icons
+        continue-on-error: true
+        id: release_build
         env:
           CI: true
-      - name: Also build debug (fallback artifact)
-        if: failure()
+      - name: Build debug APK if release failed
+        if: steps.release_build.outcome == 'failure'
         run: flutter build apk --debug
         env:
           CI: true
+      - name: Fail if no APK produced
+        run: test -n "$(ls -1 build/app/outputs/flutter-apk/*.apk 2>/dev/null | head -1)"
 
       - uses: actions/upload-artifact@v4
         with:
