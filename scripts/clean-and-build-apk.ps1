@@ -17,7 +17,7 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue @(
 & $flutter pub get
 
 Write-Host "Building release APK (split per ABI)..." -ForegroundColor Cyan
-& $flutter build apk --release
+& $flutter build apk --release --split-per-abi
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Release failed; trying debug APK..." -ForegroundColor Yellow
   & $flutter build apk --debug
